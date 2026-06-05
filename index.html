@@ -130,6 +130,7 @@
         .card-name { font-weight: bold; font-size: 1.1rem; padding-right: 20px; word-break: break-word; line-height: 1.2;}
         .card-series { font-size: 0.85rem; color: var(--text-muted); margin: 0.4rem 0 0.8rem 0; word-break: break-word; line-height: 1.3;}
         .card-ka { color: var(--kakera); font-weight: bold; font-size: 0.9rem;}
+        .card-keys { color: #f1c40f; font-size: 0.85rem; margin-top: 0.3rem; }
         .card-tags { color: var(--tags); font-size: 0.85rem; margin-top: 0.5rem; font-weight: bold; }
         
         .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; position: absolute; bottom: 0.8rem; font-weight: bold;}
@@ -384,10 +385,18 @@
                     }
                 }
 
+                raw = raw.replace(/:[a-zA-Z0-9_]+:/g, '').trim();
                 raw = raw.replace(/^\d+[\.\)]\s*/, ''); 
                 raw = raw.replace(/\*\*/g, ''); 
 
-                let kakera = 0; let tags = ""; let name = raw;
+                let kakera = 0; let tags = ""; let name = raw; let keys = 0;
+
+                // Extract key count from brackets e.g. (26)
+                const keyMatch = raw.match(/\((\d+)\)/);
+                if (keyMatch) {
+                    keys = parseInt(keyMatch[1], 10);
+                    raw = raw.replace(keyMatch[0], '').trim();
+                }
 
                 let kaMatch = raw.match(/([\d,]+)\s*ka/i);
                 if (kaMatch) {
@@ -415,11 +424,12 @@
                     if (existingChars.has(lookupKey)) {
                         let existing = existingChars.get(lookupKey);
                         existing.kakera = kakera;
+                        if (keys) existing.keys = keys;
                         if (tags) existing.tags = tags; 
                         existingChars.set(lookupKey, existing);
                         updateCount++;
                     } else {
-                        existingChars.set(lookupKey, { name, series, kakera, tags });
+                        existingChars.set(lookupKey, { name, series, kakera, keys, tags });
                         importCount++;
                     }
                 }
@@ -583,6 +593,7 @@
                     <div class="card-name">${char.name}</div>
                     <div class="card-series">${char.series}</div>
                     <div class="card-ka">💎 ${char.kakera} ka</div>
+                    ${char.keys ? `<div class="card-keys">🗝️ ${char.keys}</div>` : ''}
                     ${char.tags ? `<div class="card-tags">${char.tags}</div>` : ''}
                 `;
                 grid.appendChild(card);
