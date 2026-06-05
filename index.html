@@ -193,7 +193,7 @@
                 <h2 style="color: var(--trade)">🤝 Series Trade Manager</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Mark entire series as "For Trade". All characters belonging to these series will receive visual trade badges instantly across all synchronized screens.</p>
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                    <input type="text" id="tradeSeriesInput" placeholder="Enter series name to trade (Start typing...)" list="ownedSeriesList" style="margin-bottom: 0;">
+                    <textarea id="tradeSeriesInput" placeholder="Enter one series per line, then click Tag Series..." list="ownedSeriesList" style="margin-bottom: 0; height: 80px; resize: vertical;"></textarea>
                     <datalist id="ownedSeriesList"></datalist>
                     <button class="btn btn-trade" onclick="addTradeSeries()" style="white-space: nowrap;">Tag Series</button>
                 </div>
@@ -362,7 +362,7 @@
                     continue;
                 }
 
-                if (!/(?:\d+)\s*ka/i.test(raw)) {
+                if (!/(?:[\d,]+)\s*ka/i.test(raw)) {
                     const fractionMatch = raw.match(/^(.*?)\s+-\s+\d+\/\d+$/);
                     if (fractionMatch) {
                         currentSeries = fractionMatch[1].trim();
@@ -374,7 +374,7 @@
                     }
                 }
 
-                let kakeraMatch = raw.match(/(\d+)\s*ka/i);
+                let kakeraMatch = raw.match(/([\d,]+)\s*ka/i);
                 if (kakeraMatch) {
                     let kaEndIndex = kakeraMatch.index + kakeraMatch[0].length;
                     let remainder = raw.substring(kaEndIndex).trim();
@@ -389,9 +389,9 @@
 
                 let kakera = 0; let tags = ""; let name = raw;
 
-                let kaMatch = raw.match(/(\d+)\s*ka/i);
+                let kaMatch = raw.match(/([\d,]+)\s*ka/i);
                 if (kaMatch) {
-                    kakera = parseInt(kaMatch[1], 10);
+                    kakera = parseInt(kaMatch[1].replace(/,/g, ''), 10);
                     let splitIdx = kaMatch.index + kaMatch[0].length;
                     tags = raw.substring(splitIdx).trim();
                     name = raw.substring(0, kaMatch.index).replace(/[-·—~]+$/, '').trim();
@@ -450,9 +450,17 @@
             if (!input) return;
             if (!window.tradeDB[window.activeProfile]) window.tradeDB[window.activeProfile] = [];
             
+            const entries = input.split('\n').map(s => s.trim()).filter(s => s.length > 0);
             const existingLower = window.tradeDB[window.activeProfile].map(s => s.toLowerCase());
-            if (!existingLower.includes(input.toLowerCase())) {
-                window.tradeDB[window.activeProfile].push(input);
+            let added = false;
+            entries.forEach(entry => {
+                if (!existingLower.includes(entry.toLowerCase())) {
+                    window.tradeDB[window.activeProfile].push(entry);
+                    existingLower.push(entry.toLowerCase());
+                    added = true;
+                }
+            });
+            if (added) {
                 document.getElementById('tradeSeriesInput').value = '';
                 commitToCloud();
             }
