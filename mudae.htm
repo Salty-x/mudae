@@ -3,7 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mudae Collection Manager v9</title>
+    <title>Mudae Cloud Manager v9.0</title>
+    
+    <!-- Firebase Cloud Live-Sync SDK Modules -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        // Your exact Firebase project credentials
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFMSDydDFdLlblDqaAQ4IpoyKGtTrdvxc",
+            authDomain: "mudae-hub.firebaseapp.com",
+            projectId: "mudae-hub",
+            storageBucket: "mudae-hub.firebasestorage.app",
+            messagingSenderId: "1055802189217",
+            appId: "1:1055802189217:web:ef413ea00a67ce3e1597e0",
+            measurementId: "G-KQGF2G2958"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const firestore = getFirestore(app);
+
+        // Core synchronization bridge functions
+        window.saveToCloud = (charactersData, tradeTagsData) => {
+            setDoc(doc(firestore, "mudaeData", "sharedCollection"), {
+                characters: charactersData,
+                tradeTags: tradeTagsData
+            });
+        };
+
+        // Live stream cloud updates straight to the UI
+        onSnapshot(doc(firestore, "mudaeData", "sharedCollection"), (snapshot) => {
+            if (snapshot.exists()) {
+                const cloudData = snapshot.data();
+                window.db = cloudData.characters || {};
+                window.tradeDB = cloudData.tradeTags || {};
+            } else {
+                window.db = {};
+                window.tradeDB = {};
+            }
+            
+            // Set an initial active profile if none is selected yet
+            if (!window.activeProfile && Object.keys(window.db).length > 0) {
+                window.activeProfile = Object.keys(window.db)[0];
+            }
+            
+            window.syncUIWithCloud();
+        });
+    </script>
+
     <style>
         :root {
             --bg-base: #0f0f13;
@@ -93,10 +141,10 @@
 <body>
 
     <nav>
-        <h1>Mudae Manager</h1>
+        <h1>Mudae Cloud Hub</h1>
         <div class="nav-links">
-            <button class="active" onclick="switchTab('profiles')">👥 Profiles & Data</button>
-            <button onclick="switchTab('gallery')">🖼️ Collection Gallery</button>
+            <button id="nav-profiles" class="active" onclick="switchTab('profiles')">👥 Profiles & Data</button>
+            <button id="nav-gallery" onclick="switchTab('gallery')">🖼️ Collection Gallery</button>
         </div>
     </nav>
 
@@ -104,9 +152,9 @@
         <!-- PROFILES & DATA VIEW -->
         <div id="profiles" class="view active">
             <div class="panel">
-                <h2>1. Manage Profiles</h2>
+                <h2>1. Manage Cloud Profiles</h2>
                 <div style="display: flex; gap: 1rem;">
-                    <input type="text" id="newProfileName" placeholder="Enter friend's name (e.g., Alex, saalty._)" style="margin-bottom: 0;">
+                    <input type="text" id="newProfileName" placeholder="Enter profile name (e.g., Alex, saalty._)" style="margin-bottom: 0;">
                     <button class="btn" onclick="addProfile()">Create Profile</button>
                 </div>
                 <div class="profile-list" id="profileList"></div>
@@ -117,18 +165,18 @@
                     2. Update Selected Collection
                     <button class="btn btn-danger btn-small" onclick="clearActiveProfile()">Wipe Profile Data</button>
                 </h2>
-                <p style="color: var(--text-muted); margin-bottom: 1rem;">Paste your Mudae output. Supports <code>$mm</code>, <code>$mma</code>, and <code>$mmk</code>.</p>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">Paste your Discord Mudae output here. Supports list commands like <code>$mm</code>, <code>$mma</code>, and <code>$mmk</code>.</p>
                 <textarea id="importData" placeholder="Paste Discord output here..."></textarea>
                 <button class="btn" onclick="processImport()">Smart Merge Import</button>
             </div>
 
             <div class="panel">
-                <h2>💾 Database Backup & Restore</h2>
+                <h2>💾 Manual Database Backup & Restore</h2>
                 <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                     <button class="btn btn-success" onclick="exportData()">⬇️ Download Backup File</button>
                     <div style="border-left: 1px solid #3f3f4e; height: 30px;"></div>
                     <input type="file" id="importFile" accept=".json" style="width: auto; margin: 0;">
-                    <button class="btn" onclick="importDataFile()">⬆️ Restore from File</button>
+                    <button class="btn" onclick="importDataFile()">⬆️ Overwrite Cloud from Backup</button>
                 </div>
             </div>
         </div>
@@ -140,10 +188,10 @@
                 <div class="stat-box">Total Net Worth <span id="statValue" style="color: var(--kakera)">0 ka</span></div>
             </div>
 
-            <!-- NEW: Series Trade Manager -->
+            <!-- Series Trade Manager -->
             <div class="panel" style="border-color: var(--trade);">
                 <h2 style="color: var(--trade)">🤝 Series Trade Manager</h2>
-                <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Mark entire series as "For Trade". All characters in these series will be tagged automatically.</p>
+                <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Mark entire series as "For Trade". All characters belonging to these series will receive visual trade badges instantly across all synchronized screens.</p>
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                     <input type="text" id="tradeSeriesInput" placeholder="Enter series name to trade (Start typing...)" list="ownedSeriesList" style="margin-bottom: 0;">
                     <datalist id="ownedSeriesList"></datalist>
@@ -152,7 +200,7 @@
                 <div id="tradeSeriesContainer" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
             </div>
 
-            <!-- Wishlist Manager -->
+            <!-- Cross-Match Wishlist Manager -->
             <div class="panel" style="background: rgba(255, 62, 108, 0.05); border-color: var(--wishlist);">
                 <h2 style="color: var(--wishlist)">🎯 Cross-Match Wishlist</h2>
                 <input type="text" id="wishlistInput" placeholder="Paste a wishlist (comma separated or new lines) to find exact matches..." oninput="applyFilters()">
@@ -189,23 +237,20 @@
     </div>
 
     <script>
-        // Two DBs: One for characters, one for trade settings
-        let db = JSON.parse(localStorage.getItem('mudaeDB')) || {};
-        let tradeDB = JSON.parse(localStorage.getItem('mudaeTradeDB')) || {};
+        // Global Local Fallbacks driven securely by Firebase's snapshots
+        window.db = {};
+        window.tradeDB = {};
+        window.activeProfile = null;
         
-        let activeProfile = Object.keys(db)[0] || null;
         let filteredData = [];
         let currentPage = 1;
         const itemsPerPage = 24;
-
-        renderProfiles();
-        if (activeProfile) selectProfile(activeProfile);
 
         function switchTab(tabId) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-links button').forEach(b => b.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
+            document.getElementById('nav-' + tabId).classList.add('active');
             
             if(tabId === 'gallery') {
                 updateSeriesDatalist();
@@ -214,55 +259,71 @@
             }
         }
 
+        // Global Sync point executed automatically when Firebase reports data updates
+        window.syncUIWithCloud = () => {
+            renderProfiles();
+            if (window.activeProfile) {
+                document.getElementById('galleryTitle').innerText = `Viewing: ${window.activeProfile}'s Collection`;
+            }
+            updateSeriesDatalist();
+            renderTradeSeries();
+            applyFilters();
+        };
+
+        function commitToCloud() {
+            if (typeof window.saveToCloud === 'function') {
+                window.saveToCloud(window.db, window.tradeDB);
+            }
+        }
+
         // --- Profile Management ---
         function addProfile() {
             const name = document.getElementById('newProfileName').value.trim();
-            if (!name || db[name]) return alert('Invalid or duplicate name!');
-            db[name] = [];
-            tradeDB[name] = [];
-            saveDB();
+            if (!name || window.db[name]) return alert('Invalid or duplicate name!');
+            window.db[name] = [];
+            window.tradeDB[name] = [];
             document.getElementById('newProfileName').value = '';
-            selectProfile(name);
-            renderProfiles();
+            window.activeProfile = name;
+            commitToCloud();
         }
 
         function deleteProfile(name) {
-            if (confirm(`Delete ${name}'s profile entirely?`)) {
-                delete db[name];
-                delete tradeDB[name];
-                saveDB();
-                if (activeProfile === name) activeProfile = Object.keys(db)[0] || null;
-                renderProfiles();
+            if (confirm(`Delete ${name}'s profile entirely from the cloud?`)) {
+                delete window.db[name];
+                delete window.tradeDB[name];
+                if (window.activeProfile === name) window.activeProfile = Object.keys(window.db)[0] || null;
+                commitToCloud();
             }
         }
 
         function clearActiveProfile() {
-            if(!activeProfile) return;
-            if(confirm(`Wipe all characters from ${activeProfile}? This cannot be undone.`)){
-                db[activeProfile] = [];
-                tradeDB[activeProfile] = [];
-                saveDB();
-                renderProfiles();
+            if(!window.activeProfile) return;
+            if(confirm(`Wipe all characters from ${window.activeProfile}? This cannot be undone.`)){
+                window.db[window.activeProfile] = [];
+                window.tradeDB[window.activeProfile] = [];
+                commitToCloud();
                 alert('Profile wiped clean.');
             }
         }
 
         function selectProfile(name) {
-            activeProfile = name;
-            if (!tradeDB[activeProfile]) tradeDB[activeProfile] = []; // fallback safety
-            renderProfiles();
+            window.activeProfile = name;
+            if (!window.tradeDB[window.activeProfile]) window.tradeDB[window.activeProfile] = [];
             document.getElementById('galleryTitle').innerText = `Viewing: ${name}'s Collection`;
             updateSeriesDatalist();
             renderTradeSeries();
+            applyFilters();
+            renderProfiles();
         }
 
         function renderProfiles() {
             const container = document.getElementById('profileList');
+            if (!container) return;
             container.innerHTML = '';
-            for (const name in db) {
-                const count = db[name].length;
+            for (const name in window.db) {
+                const count = window.db[name].length;
                 const div = document.createElement('div');
-                div.className = `profile-badge ${activeProfile === name ? 'selected' : ''}`;
+                div.className = `profile-badge ${window.activeProfile === name ? 'selected' : ''}`;
                 div.onclick = () => selectProfile(name);
                 div.innerHTML = `
                     <span><strong>${name}</strong> (${count})</span>
@@ -274,14 +335,14 @@
 
         // --- Core Import Engine ---
         function processImport() {
-            if (!activeProfile) return alert('Select a profile first!');
+            if (!window.activeProfile) return alert('Select or create a profile first!');
             let text = document.getElementById('importData').value;
             if (!text.trim()) return alert('Paste data first!');
 
             let lines = text.split('\n');
             let existingChars = new Map();
-            if(db[activeProfile]) {
-                db[activeProfile].forEach(c => existingChars.set(`${c.name.toLowerCase()}:::${c.series.toLowerCase()}`, c));
+            if(window.db[window.activeProfile]) {
+                window.db[window.activeProfile].forEach(c => existingChars.set(`${c.name.toLowerCase()}:::${c.series.toLowerCase()}`, c));
             }
             
             let importCount = 0; let updateCount = 0;
@@ -367,21 +428,19 @@
                 }
             }
 
-            db[activeProfile] = Array.from(existingChars.values());
-            saveDB();
+            window.db[window.activeProfile] = Array.from(existingChars.values());
             document.getElementById('importData').value = '';
-            renderProfiles();
-            updateSeriesDatalist();
-            alert(`Success! Added ${importCount} new characters. Updated ${updateCount} existing ones.`);
+            commitToCloud();
+            alert(`Success! Added ${importCount} new characters. Updated ${updateCount} existing ones to the Cloud.`);
         }
 
         // --- Trade Series Manager ---
         function updateSeriesDatalist() {
-            if (!activeProfile || !db[activeProfile]) return;
+            if (!window.activeProfile || !window.db[window.activeProfile]) return;
             const datalist = document.getElementById('ownedSeriesList');
+            if(!datalist) return;
             datalist.innerHTML = '';
-            // Get unique series sorted alphabetically
-            const uniqueSeries = [...new Set(db[activeProfile].map(c => c.series))].sort();
+            const uniqueSeries = [...new Set(window.db[window.activeProfile].map(c => c.series))].sort();
             uniqueSeries.forEach(s => {
                 let option = document.createElement('option');
                 option.value = s;
@@ -392,37 +451,33 @@
         function addTradeSeries() {
             const input = document.getElementById('tradeSeriesInput').value.trim();
             if (!input) return;
-            if (!tradeDB[activeProfile]) tradeDB[activeProfile] = [];
+            if (!window.tradeDB[window.activeProfile]) window.tradeDB[window.activeProfile] = [];
             
-            const existingLower = tradeDB[activeProfile].map(s => s.toLowerCase());
+            const existingLower = window.tradeDB[window.activeProfile].map(s => s.toLowerCase());
             if (!existingLower.includes(input.toLowerCase())) {
-                tradeDB[activeProfile].push(input); // Push exact casing for UI display
-                saveDB();
+                window.tradeDB[window.activeProfile].push(input);
                 document.getElementById('tradeSeriesInput').value = '';
-                renderTradeSeries();
-                applyFilters();
+                commitToCloud();
             }
         }
 
         function removeTradeSeries(seriesName) {
-            tradeDB[activeProfile] = tradeDB[activeProfile].filter(s => s !== seriesName);
-            saveDB();
-            renderTradeSeries();
-            applyFilters();
+            window.tradeDB[window.activeProfile] = window.tradeDB[window.activeProfile].filter(s => s !== seriesName);
+            commitToCloud();
         }
 
         function renderTradeSeries() {
             const container = document.getElementById('tradeSeriesContainer');
+            if(!container) return;
             container.innerHTML = '';
-            if (!tradeDB[activeProfile] || tradeDB[activeProfile].length === 0) {
+            if (!window.tradeDB[window.activeProfile] || window.tradeDB[window.activeProfile].length === 0) {
                 container.innerHTML = `<span style="color:var(--text-muted); font-size: 0.85rem;">No series currently marked for trade.</span>`;
                 return;
             }
 
-            tradeDB[activeProfile].forEach(s => {
+            window.tradeDB[window.activeProfile].forEach(s => {
                 const tag = document.createElement('div');
                 tag.className = 'trade-tag';
-                // Escape quotes for the inline onclick function
                 const safeSeries = s.replace(/'/g, "\\'");
                 tag.innerHTML = `<span>${s}</span> <button onclick="removeTradeSeries('${safeSeries}')">✖</button>`;
                 container.appendChild(tag);
@@ -430,35 +485,37 @@
         }
 
         function deleteCharacter(name, series) {
-            if(confirm(`Remove ${name} from your collection?`)) {
-                db[activeProfile] = db[activeProfile].filter(c => !(c.name === name && c.series === series));
-                saveDB();
-                applyFilters(); 
+            if(confirm(`Remove ${name} from your cloud collection?`)) {
+                window.db[window.activeProfile] = window.db[window.activeProfile].filter(c => !(c.name === name && c.series === series));
+                commitToCloud();
             }
         }
 
-        // --- Gallery Engine ---
+        // --- Gallery Filtering & Presentation ---
         function applyFilters() {
-            if (!activeProfile || !db[activeProfile]) return;
+            if (!window.activeProfile || !window.db[window.activeProfile]) return;
             
-            const totalKa = db[activeProfile].reduce((sum, c) => sum + c.kakera, 0);
-            document.getElementById('statCount').innerText = db[activeProfile].length;
-            document.getElementById('statValue').innerText = totalKa.toLocaleString() + ' ka';
+            const totalKa = window.db[window.activeProfile].reduce((sum, c) => sum + c.kakera, 0);
+            
+            const statCountEl = document.getElementById('statCount');
+            const statValueEl = document.getElementById('statValue');
+            if(statCountEl) statCountEl.innerText = window.db[window.activeProfile].length;
+            if(statValueEl) statValueEl.innerText = totalKa.toLocaleString() + ' ka';
 
-            const qName = document.getElementById('searchName').value.toLowerCase();
-            const qSeries = document.getElementById('searchSeries').value.toLowerCase();
-            const minK = parseInt(document.getElementById('minKa').value) || 0;
-            const maxK = parseInt(document.getElementById('maxKa').value) || 999999;
-            const sort = document.getElementById('sortBy').value;
-            const showTradeOnly = document.getElementById('filterTradeOnly').checked;
+            const qName = document.getElementById('searchName') ? document.getElementById('searchName').value.toLowerCase() : '';
+            const qSeries = document.getElementById('searchSeries') ? document.getElementById('searchSeries').value.toLowerCase() : '';
+            const minK = (document.getElementById('minKa') && document.getElementById('minKa').value) ? parseInt(document.getElementById('minKa').value) : 0;
+            const maxK = (document.getElementById('maxKa') && document.getElementById('maxKa').value) ? parseInt(document.getElementById('maxKa').value) : 999999;
+            const sort = document.getElementById('sortBy') ? document.getElementById('sortBy').value : 'ka-desc';
+            const showTradeOnly = document.getElementById('filterTradeOnly') ? document.getElementById('filterTradeOnly').checked : false;
             
-            const rawWishlist = document.getElementById('wishlistInput').value.toLowerCase();
+            const wishlistInputEl = document.getElementById('wishlistInput');
+            const rawWishlist = wishlistInputEl ? wishlistInputEl.value.toLowerCase() : '';
             const wishlistArray = rawWishlist.split(/[,|\n]+/).map(w => w.trim()).filter(w => w.length > 0);
             
-            // Get lowercase array of series marked for trade
-            const activeTradeSeries = (tradeDB[activeProfile] || []).map(s => s.toLowerCase());
+            const activeTradeSeries = (window.tradeDB[window.activeProfile] || []).map(s => s.toLowerCase());
 
-            filteredData = db[activeProfile].map(c => {
+            filteredData = window.db[window.activeProfile].map(c => {
                 const isWished = wishlistArray.some(w => c.name.toLowerCase() === w);
                 const isForTrade = activeTradeSeries.includes(c.series.toLowerCase());
                 return {...c, isWished, isForTrade}; 
@@ -478,8 +535,9 @@
 
             filteredData.sort((a, b) => (a.isWished === b.isWished) ? 0 : a.isWished ? -1 : 1);
 
-            document.getElementById('resultCount').innerText = `${filteredData.length} characters found`;
-            currentPage = 1; 
+            const resultCountEl = document.getElementById('resultCount');
+            if (resultCountEl) resultCountEl.innerText = `${filteredData.length} characters found`;
+            
             renderGallery();
         }
 
@@ -490,12 +548,20 @@
 
         function renderGallery() {
             const grid = document.getElementById('characterGrid');
+            if (!grid) return;
             grid.innerHTML = '';
 
             const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-            document.getElementById('pageIndicator').innerText = `Page ${currentPage} of ${totalPages}`;
-            document.getElementById('prevBtn').disabled = currentPage === 1;
-            document.getElementById('nextBtn').disabled = currentPage === totalPages;
+            if(currentPage > totalPages) currentPage = totalPages;
+            if(currentPage < 1) currentPage = 1;
+
+            const pageIndicatorEl = document.getElementById('pageIndicator');
+            const prevBtnEl = document.getElementById('prevBtn');
+            const nextBtnEl = document.getElementById('nextBtn');
+
+            if(pageIndicatorEl) pageIndicatorEl.innerText = `Page ${currentPage} of ${totalPages}`;
+            if(prevBtnEl) prevBtnEl.disabled = currentPage === 1;
+            if(nextBtnEl) nextBtnEl.disabled = currentPage === totalPages;
 
             const start = (currentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
@@ -518,50 +584,38 @@
             });
         }
 
-        // --- Secure Database Management ---
-        function saveDB() {
-            localStorage.setItem('mudaeDB', JSON.stringify(db));
-            localStorage.setItem('mudaeTradeDB', JSON.stringify(tradeDB));
-        }
-
+        // --- Manual Backup Downloader & Emergency Restores ---
         function exportData() {
-            const payload = { characters: db, tradeTags: tradeDB };
+            const payload = { characters: window.db, tradeTags: window.tradeDB };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload));
             const dlAnchorElem = document.createElement('a');
             dlAnchorElem.setAttribute("href", dataStr);
             const dateStr = new Date().toISOString().slice(0,10);
-            dlAnchorElem.setAttribute("download", `mudae_backup_${dateStr}.json`);
+            dlAnchorElem.setAttribute("download", `mudae_cloud_backup_${dateStr}.json`);
             dlAnchorElem.click();
         }
 
         function importDataFile() {
             const file = document.getElementById('importFile').files[0];
             if (!file) return alert("Please select a JSON backup file first.");
-            
-            if (!confirm("WARNING: This will overwrite your current database. Are you sure you want to proceed?")) return;
+            if (!confirm("WARNING: This will completely replace whatever is currently in the Firebase Cloud database. Sync will instantly spread this change to all active friends. Proceed?")) return;
 
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    
-                    // Support for new v9 combined backups
                     if (importedData.characters && typeof importedData.characters === 'object') {
-                        db = importedData.characters;
-                        tradeDB = importedData.tradeTags || {};
+                        window.db = importedData.characters;
+                        window.tradeDB = importedData.tradeTags || {};
                     } else if (typeof importedData === 'object') {
-                        // Backwards compatibility for old v8 backups
-                        db = importedData;
-                        tradeDB = {};
+                        window.db = importedData;
+                        window.tradeDB = {};
                     }
-
-                    saveDB();
-                    activeProfile = Object.keys(db)[0] || null;
-                    renderProfiles();
-                    alert("Database restored successfully!");
+                    commitToCloud();
+                    alert("Database restored and pushed to Cloud successfully!");
                     document.getElementById('importFile').value = ""; 
                 } catch (err) {
-                    alert("Invalid JSON file.");
+                    alert("Failed to read file. Make sure it's a valid backup JSON.");
                 }
             };
             reader.readAsText(file);
