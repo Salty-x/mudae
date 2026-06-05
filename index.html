@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mudae Cloud Manager v9.0</title>
+    <title>Mudae Cloud Manager</title>
     
-    <!-- Firebase Cloud Live-Sync SDK Modules -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
@@ -24,16 +23,26 @@
         const app = initializeApp(firebaseConfig);
         const firestore = getFirestore(app);
 
-        // Core synchronization bridge functions
         window.saveToCloud = (charactersData, tradeTagsData) => {
+            const statusEl = document.getElementById('cloudStatus');
+            if(statusEl) { statusEl.innerText = "🟡 Syncing..."; statusEl.style.color = "#f1c40f"; }
+            
             setDoc(doc(firestore, "mudaeData", "sharedCollection"), {
                 characters: charactersData,
                 tradeTags: tradeTagsData
+            }).then(() => {
+                if(statusEl) { statusEl.innerText = "🟢 Cloud Synced"; statusEl.style.color = "var(--success)"; }
+            }).catch((err) => {
+                console.error(err);
+                if(statusEl) { statusEl.innerText = "🔴 Sync Error"; statusEl.style.color = "var(--danger)"; }
             });
         };
 
         // Live stream cloud updates straight to the UI
         onSnapshot(doc(firestore, "mudaeData", "sharedCollection"), (snapshot) => {
+            const statusEl = document.getElementById('cloudStatus');
+            if(statusEl) { statusEl.innerText = "🟢 Cloud Synced"; statusEl.style.color = "var(--success)"; }
+
             if (snapshot.exists()) {
                 const cloudData = snapshot.data();
                 window.db = cloudData.characters || {};
@@ -43,12 +52,15 @@
                 window.tradeDB = {};
             }
             
-            // Set an initial active profile if none is selected yet
             if (!window.activeProfile && Object.keys(window.db).length > 0) {
                 window.activeProfile = Object.keys(window.db)[0];
             }
             
             window.syncUIWithCloud();
+        }, (error) => {
+            console.error("Firebase Snapshot Error:", error);
+            const statusEl = document.getElementById('cloudStatus');
+            if(statusEl) { statusEl.innerText = "🔴 Database Blocked (Check Firebase Rules)"; statusEl.style.color = "var(--danger)"; }
         });
     </script>
 
@@ -73,7 +85,7 @@
         body { background-color: var(--bg-base); color: var(--text-main); }
         
         nav { background: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2f3136; flex-wrap: wrap; gap: 1rem;}
-        nav h1 { color: var(--primary); font-size: 1.5rem; }
+        nav h1 { color: var(--primary); font-size: 1.5rem; display: flex; align-items: center; gap: 1rem; }
         .nav-links button { background: none; border: none; color: var(--text-muted); font-size: 1rem; cursor: pointer; padding: 0.5rem 1rem; border-radius: 6px; transition: 0.2s; }
         .nav-links button:hover, .nav-links button.active { color: white; background: #2f3136; }
 
@@ -86,12 +98,10 @@
         
         input, select, textarea { width: 100%; padding: 0.8rem; background: var(--bg-card); border: 1px solid #3f3f4e; color: white; border-radius: 8px; margin-bottom: 1rem; }
         textarea { height: 150px; resize: vertical; font-family: monospace; }
-        input[type="file"] { padding: 0.5rem; }
         
         button.btn { background: var(--primary); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button.btn:hover { background: var(--primary-hover); }
         button.btn-danger { background: var(--danger); }
-        button.btn-success { background: var(--success); }
         button.btn-trade { background: var(--trade); }
         button.btn-trade:hover { background: #d35400; }
         button.btn-small { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
@@ -141,15 +151,17 @@
 <body>
 
     <nav>
-        <h1>Mudae Cloud Hub</h1>
+        <h1>
+            Mudae Hub
+            <span id="cloudStatus" style="font-size: 0.8rem; color: #f1c40f; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 12px;">🟡 Connecting...</span>
+        </h1>
         <div class="nav-links">
-            <button id="nav-profiles" class="active" onclick="switchTab('profiles')">👥 Profiles & Data</button>
-            <button id="nav-gallery" onclick="switchTab('gallery')">🖼️ Collection Gallery</button>
+            <button id="nav-profiles" class="active" onclick="switchTab('profiles')">👥 Profiles</button>
+            <button id="nav-gallery" onclick="switchTab('gallery')">🖼️ Gallery</button>
         </div>
     </nav>
 
     <div class="container">
-        <!-- PROFILES & DATA VIEW -->
         <div id="profiles" class="view active">
             <div class="panel">
                 <h2>1. Manage Cloud Profiles</h2>
@@ -167,28 +179,16 @@
                 </h2>
                 <p style="color: var(--text-muted); margin-bottom: 1rem;">Paste your Discord Mudae output here. Supports list commands like <code>$mm</code>, <code>$mma</code>, and <code>$mmk</code>.</p>
                 <textarea id="importData" placeholder="Paste Discord output here..."></textarea>
-                <button class="btn" onclick="processImport()">Smart Merge Import</button>
-            </div>
-
-            <div class="panel">
-                <h2>💾 Manual Database Backup & Restore</h2>
-                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                    <button class="btn btn-success" onclick="exportData()">⬇️ Download Backup File</button>
-                    <div style="border-left: 1px solid #3f3f4e; height: 30px;"></div>
-                    <input type="file" id="importFile" accept=".json" style="width: auto; margin: 0;">
-                    <button class="btn" onclick="importDataFile()">⬆️ Overwrite Cloud from Backup</button>
-                </div>
+                <button class="btn" onclick="processImport()">Smart Merge to Cloud</button>
             </div>
         </div>
 
-        <!-- GALLERY VIEW -->
         <div id="gallery" class="view">
             <div class="dashboard-stats">
                 <div class="stat-box">Total Characters <span id="statCount">0</span></div>
                 <div class="stat-box">Total Net Worth <span id="statValue" style="color: var(--kakera)">0 ka</span></div>
             </div>
 
-            <!-- Series Trade Manager -->
             <div class="panel" style="border-color: var(--trade);">
                 <h2 style="color: var(--trade)">🤝 Series Trade Manager</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Mark entire series as "For Trade". All characters belonging to these series will receive visual trade badges instantly across all synchronized screens.</p>
@@ -200,7 +200,6 @@
                 <div id="tradeSeriesContainer" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
             </div>
 
-            <!-- Cross-Match Wishlist Manager -->
             <div class="panel" style="background: rgba(255, 62, 108, 0.05); border-color: var(--wishlist);">
                 <h2 style="color: var(--wishlist)">🎯 Cross-Match Wishlist</h2>
                 <input type="text" id="wishlistInput" placeholder="Paste a wishlist (comma separated or new lines) to find exact matches..." oninput="applyFilters()">
@@ -237,7 +236,6 @@
     </div>
 
     <script>
-        // Global Local Fallbacks driven securely by Firebase's snapshots
         window.db = {};
         window.tradeDB = {};
         window.activeProfile = null;
@@ -259,7 +257,6 @@
             }
         }
 
-        // Global Sync point executed automatically when Firebase reports data updates
         window.syncUIWithCloud = () => {
             renderProfiles();
             if (window.activeProfile) {
@@ -582,43 +579,6 @@
                 `;
                 grid.appendChild(card);
             });
-        }
-
-        // --- Manual Backup Downloader & Emergency Restores ---
-        function exportData() {
-            const payload = { characters: window.db, tradeTags: window.tradeDB };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            const dateStr = new Date().toISOString().slice(0,10);
-            dlAnchorElem.setAttribute("download", `mudae_cloud_backup_${dateStr}.json`);
-            dlAnchorElem.click();
-        }
-
-        function importDataFile() {
-            const file = document.getElementById('importFile').files[0];
-            if (!file) return alert("Please select a JSON backup file first.");
-            if (!confirm("WARNING: This will completely replace whatever is currently in the Firebase Cloud database. Sync will instantly spread this change to all active friends. Proceed?")) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    if (importedData.characters && typeof importedData.characters === 'object') {
-                        window.db = importedData.characters;
-                        window.tradeDB = importedData.tradeTags || {};
-                    } else if (typeof importedData === 'object') {
-                        window.db = importedData;
-                        window.tradeDB = {};
-                    }
-                    commitToCloud();
-                    alert("Database restored and pushed to Cloud successfully!");
-                    document.getElementById('importFile').value = ""; 
-                } catch (err) {
-                    alert("Failed to read file. Make sure it's a valid backup JSON.");
-                }
-            };
-            reader.readAsText(file);
         }
     </script>
 </body>
