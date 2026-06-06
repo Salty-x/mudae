@@ -129,6 +129,641 @@
         
         .card-name { font-weight: bold; font-size: 1.1rem; padding-right: 20px; word-break: break-word; line-height: 1.2;}
         .card-series { font-size: 0.85rem; color: var(--text-muted); margin: 0.4rem 0 0.8rem 0; word-break: break-word; line-height: 1.3;}
+        .card-img { width: 100%; object-fit: cover; border-radius: 6px; margin-bottom: 0.8rem; display: block; }
+        .card-img-placeholder { width: 100%; height: 60px; border-radius: 6px; margin-bottom: 0.8rem; background: #2a2a3a; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; }
+        .card-ka { color: var(--kakera); font-weight: bold; font-size: 0.9rem;}
+        .card-keys { color: #f1c40f; font-size: 0.85rem; margin-top: 0.3rem; }
+        .card-tags { color: var(--tags); font-size: 0.85rem; margin-top: 0.5rem; font-weight: bold; }
+        
+        .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; position: absolute; bottom: 0.8rem; font-weight: bold;}
+        .badge-wished { background: var(--wishlist); right: 1.2rem; }
+        .badge-trade { background: var(--trade); left: 1.2rem; color: white;}
+        .delete-char { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; }
+        .delete-char:hover { color: var(--danger); }
+
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; }
+        .pagination button { background: var(--bg-panel); color: white; border: 1px solid #3f3f4e; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+        .pagination button:hover:not(:disabled) { background: var(--primary); }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .trade-tag { background: rgba(230, 126, 34, 0.1); border: 1px solid var(--trade); color: var(--trade); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+        .trade-tag button { background: none; border: none; color: inherit; cursor: pointer; font-weight: bold;}
+        .trade-tag button:hover { color: white; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <h1>
+            Mudae Hub
+            <span id="cloudStatus" style="font-size: 0.8rem; color: #f1c40f; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 12px;">🟡 Connecting...</span>
+        </h1>
+        <div class="nav-links">
+            <button id="nav-profiles" class="active" onclick="switchTab('profiles')">👥 Profiles</button>
+            <button id="nav-gallery" onclick="switchTab('gallery')">🖼️ Gallery</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div id="profiles" class="view active">
+            <div class="panel">
+                <h2>1. Manage Cloud Profiles</h2>
+                <div style="display: flex; gap: 1rem;">
+                    <input type="text" id="newProfileName" placeholder="Enter profile name (e.g., Alex, saalty._)" style="margin-bottom: 0;">
+                    <button class="btn" onclick="addProfile()">Create Profile</button>
+                </div>
+                <div class="profile-list" id="profileList"></div>
+            </div>
+
+            <div class="panel">
+                <h2>
+                    2. Update Selected Collection
+                    <button class="btn btn-danger btn-small" onclick="clearActiveProfile()">Wipe Profile Data</button>
+                </h2>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">Paste your Discord Mudae output here. Supports list commands like <code>$mm</code>, <code>$mma</code>, and <code>$mmk</code>.</p>
+                <textarea id="importData" placeholder="Paste Discord output here..."></textarea>
+                <button class="btn" onclick="processImport()">Smart Merge to Cloud</button>
+            </div>
+        </div>
+
+        <div id="gallery" class="view">
+            <div class="dashboard-stats">
+                <div class="stat-box">Total Characters <span id="statCount">0</span></div>
+                <div class="stat-box">Total Net Worth <span id="statValue" style="color: var(--kakera)">0 ka</span></div>
+            </div>
+
+            <div class="panel" style="border-color: var(--trade);">
+                <h2 style="color: var(--trade)">🤝 Series Trade Manager</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Mark entire series as "For Trade". All characters belonging to these series will receive visual trade badges instantly across all synchronized screens.</p>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <textarea id="tradeSeriesInput" placeholder="Enter one series per line, then click Tag Series..." list="ownedSeriesList" style="margin-bottom: 0; height: 80px; resize: vertical;"></textarea>
+                    <datalist id="ownedSeriesList"></datalist>
+                    <button class="btn btn-trade" onclick="addTradeSeries()" style="white-space: nowrap;">Tag Series</button>
+                </div>
+                <div id="tradeSeriesContainer" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+            </div>
+
+            <div class="panel" style="background: rgba(255, 62, 108, 0.05); border-color: var(--wishlist);">
+                <h2 style="color: var(--wishlist)">🎯 Cross-Match Wishlist</h2>
+                <input type="text" id="wishlistInput" placeholder="Paste a wishlist (comma separated or new lines) to find exact matches..." oninput="applyFilters()">
+            </div>
+
+            <div class="panel">
+                <h2 id="galleryTitle">Viewing Collection</h2>
+                <div class="filter-bar">
+                    <input type="text" id="searchName" placeholder="🔎 Character Name..." oninput="applyFilters()" style="margin-bottom:0;">
+                    <input type="text" id="searchSeries" placeholder="🔎 Series..." oninput="applyFilters()" style="margin-bottom:0;">
+                    <input type="number" id="minKa" placeholder="Min Ka" oninput="applyFilters()" style="margin-bottom:0;">
+                    <input type="number" id="maxKa" placeholder="Max Ka" oninput="applyFilters()" style="margin-bottom:0;">
+                    <select id="sortBy" onchange="applyFilters()" style="margin-bottom:0;">
+                        <option value="ka-desc">Kakera (High to Low)</option>
+                        <option value="ka-asc">Kakera (Low to High)</option>
+                        <option value="alpha">Alphabetical</option>
+                    </select>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="filterTradeOnly" onchange="applyFilters()">
+                        <span style="font-size: 0.85rem; font-weight: bold; color: var(--trade)">Trade Only</span>
+                    </label>
+                </div>
+                <div style="color: var(--text-muted); margin-bottom: 1rem;" id="resultCount">0 characters found</div>
+                
+                <div class="grid" id="characterGrid"></div>
+
+                <div class="pagination">
+                    <button id="prevBtn" onclick="changePage(-1)">Previous</button>
+                    <span id="pageIndicator">Page 1 of 1</span>
+                    <button id="nextBtn" onclick="changePage(1)">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.db = {};
+        window.tradeDB = {};
+        window.activeProfile = null;
+        
+        let filteredData = [];
+        let currentPage = 1;
+        const itemsPerPage = 24;
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-links button').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('nav-' + tabId).classList.add('active');
+            
+            if(tabId === 'gallery') {
+                updateSeriesDatalist();
+                renderTradeSeries();
+                applyFilters();
+            }
+        }
+
+        window.syncUIWithCloud = () => {
+            renderProfiles();
+            if (window.activeProfile) {
+                document.getElementById('galleryTitle').innerText = `Viewing: ${window.activeProfile}'s Collection`;
+            }
+            updateSeriesDatalist();
+            renderTradeSeries();
+            applyFilters();
+        };
+
+        function commitToCloud() {
+            if (typeof window.saveToCloud === 'function') {
+                window.saveToCloud(window.db, window.tradeDB);
+            }
+        }
+
+        // --- Profile Management ---
+        function addProfile() {
+            const name = document.getElementById('newProfileName').value.trim();
+            if (!name || window.db[name]) return alert('Invalid or duplicate name!');
+            window.db[name] = [];
+            window.tradeDB[name] = [];
+            document.getElementById('newProfileName').value = '';
+            window.activeProfile = name;
+            commitToCloud();
+        }
+
+        function deleteProfile(name) {
+            if (confirm(`Delete ${name}'s profile entirely from the cloud?`)) {
+                delete window.db[name];
+                delete window.tradeDB[name];
+                if (window.activeProfile === name) window.activeProfile = Object.keys(window.db)[0] || null;
+                commitToCloud();
+            }
+        }
+
+        function clearActiveProfile() {
+            if(!window.activeProfile) return;
+            if(confirm(`Wipe all characters from ${window.activeProfile}? This cannot be undone.`)){
+                window.db[window.activeProfile] = [];
+                window.tradeDB[window.activeProfile] = [];
+                commitToCloud();
+                alert('Profile wiped clean.');
+            }
+        }
+
+        function selectProfile(name) {
+            window.activeProfile = name;
+            if (!window.tradeDB[window.activeProfile]) window.tradeDB[window.activeProfile] = [];
+            document.getElementById('galleryTitle').innerText = `Viewing: ${name}'s Collection`;
+            updateSeriesDatalist();
+            renderTradeSeries();
+            applyFilters();
+            renderProfiles();
+        }
+
+        function renderProfiles() {
+            const container = document.getElementById('profileList');
+            if (!container) return;
+            container.innerHTML = '';
+            for (const name in window.db) {
+                const count = window.db[name].length;
+                const div = document.createElement('div');
+                div.className = `profile-badge ${window.activeProfile === name ? 'selected' : ''}`;
+                div.onclick = () => selectProfile(name);
+                div.innerHTML = `
+                    <span><strong>${name}</strong> (${count})</span>
+                    <button onclick="event.stopPropagation(); deleteProfile('${name}')" title="Delete Profile">X</button>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        // --- Core Import Engine ---
+        function processImport() {
+            if (!window.activeProfile) return alert('Select or create a profile first!');
+            let text = document.getElementById('importData').value;
+            if (!text.trim()) return alert('Paste data first!');
+
+            let lines = text.split('\n');
+            let existingChars = new Map();
+            if(window.db[window.activeProfile]) {
+                window.db[window.activeProfile].forEach(c => existingChars.set(`${c.name.toLowerCase()}:::${c.series.toLowerCase()}`, c));
+            }
+            
+            let importCount = 0; let updateCount = 0;
+            let currentSeries = "Unknown"; 
+
+            for (let i = 0; i < lines.length; i++) {
+                let raw = lines[i].trim();
+                if (!raw) continue;
+
+                if (raw.toLowerCase().includes("'s harem") || raw.toLowerCase().startsWith("total value")) continue;
+
+                if (raw.startsWith('**') && raw.endsWith('**')) {
+                    currentSeries = raw.replace(/\*\*/g, '').replace(/\s+-\s+\d+\/\d+$/, '').trim();
+                    continue;
+                }
+                
+                const boldFractionMatch = raw.match(/^\*\*(.*?)\*\*\s+-\s+\d+\/\d+$/);
+                if (boldFractionMatch) {
+                    currentSeries = boldFractionMatch[1].trim();
+                    continue;
+                }
+
+                if (!/(?:[\d,]+)\s*ka/i.test(raw)) {
+                    const fractionMatch = raw.match(/^(.*?)\s+-\s+\d+\/\d+$/);
+                    if (fractionMatch) {
+                        currentSeries = fractionMatch[1].trim();
+                        continue;
+                    }
+                    if (!/\d\s*$/.test(raw)) {
+                        currentSeries = raw.trim();
+                        continue;
+                    }
+                }
+
+                let kakeraMatch = raw.match(/([\d,]+)\s*ka/i);
+                if (kakeraMatch) {
+                    let kaEndIndex = kakeraMatch.index + kakeraMatch[0].length;
+                    let remainder = raw.substring(kaEndIndex).trim();
+                    if (remainder.match(/-\s*\d+\/\d+$/) || remainder.startsWith('**')) {
+                        lines.splice(i + 1, 0, remainder);
+                        raw = raw.substring(0, kaEndIndex).trim();
+                    }
+                }
+
+                raw = raw.replace(/:[a-zA-Z0-9_]+:/g, '').trim();
+                raw = raw.replace(/^\d+[\.\)]\s*/, ''); 
+                raw = raw.replace(/\*\*/g, ''); 
+
+                let kakera = 0; let tags = ""; let name = raw; let keys = 0;
+
+                // Extract key count from brackets e.g. (26)
+                const keyMatch = raw.match(/\((\d+)\)/);
+                if (keyMatch) {
+                    keys = parseInt(keyMatch[1], 10);
+                    raw = raw.replace(keyMatch[0], '').trim();
+                }
+
+                let kaMatch = raw.match(/([\d,]+)\s*ka/i);
+                if (kaMatch) {
+                    kakera = parseInt(kaMatch[1].replace(/,/g, ''), 10);
+                    let splitIdx = kaMatch.index + kaMatch[0].length;
+                    tags = raw.substring(splitIdx).trim();
+                    name = raw.substring(0, kaMatch.index).replace(/[-·—~]+$/, '').trim();
+                } else {
+                    const trailingNum = raw.match(/[-·—~]?\s*(\d+)\s*$/);
+                    if (trailingNum) {
+                        kakera = parseInt(trailingNum[1], 10);
+                        name = raw.substring(0, trailingNum.index).trim();
+                    }
+                }
+
+                let series = currentSeries;
+                const inlineSeriesMatch = name.match(/\s*\(([^)]+)\)$/);
+                if (inlineSeriesMatch) {
+                    series = inlineSeriesMatch[1].trim();
+                    name = name.replace(/\s*\(([^)]+)\)$/, '').trim();
+                }
+
+                if (name.length > 0) {
+                    const lookupKey = `${name.toLowerCase()}:::${series.toLowerCase()}`;
+                    if (existingChars.has(lookupKey)) {
+                        let existing = existingChars.get(lookupKey);
+                        existing.kakera = kakera;
+                        if (keys) existing.keys = keys;
+                        if (tags) existing.tags = tags; 
+                        existingChars.set(lookupKey, existing);
+                        updateCount++;
+                    } else {
+                        existingChars.set(lookupKey, { name, series, kakera, keys, tags });
+                        importCount++;
+                    }
+                }
+            }
+
+            window.db[window.activeProfile] = Array.from(existingChars.values());
+            document.getElementById('importData').value = '';
+            commitToCloud();
+            alert(`Success! Added ${importCount} new characters. Updated ${updateCount} existing ones to the Cloud.`);
+        }
+
+        // --- Trade Series Manager ---
+        function updateSeriesDatalist() {
+            if (!window.activeProfile || !window.db[window.activeProfile]) return;
+            const datalist = document.getElementById('ownedSeriesList');
+            if(!datalist) return;
+            datalist.innerHTML = '';
+            const uniqueSeries = [...new Set(window.db[window.activeProfile].map(c => c.series))].sort();
+            uniqueSeries.forEach(s => {
+                let option = document.createElement('option');
+                option.value = s;
+                datalist.appendChild(option);
+            });
+        }
+
+        function addTradeSeries() {
+            const input = document.getElementById('tradeSeriesInput').value.trim();
+            if (!input) return;
+            if (!window.tradeDB[window.activeProfile]) window.tradeDB[window.activeProfile] = [];
+            
+            const entries = input.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            const existingLower = window.tradeDB[window.activeProfile].map(s => s.toLowerCase());
+            let added = false;
+            entries.forEach(entry => {
+                if (!existingLower.includes(entry.toLowerCase())) {
+                    window.tradeDB[window.activeProfile].push(entry);
+                    existingLower.push(entry.toLowerCase());
+                    added = true;
+                }
+            });
+            if (added) {
+                document.getElementById('tradeSeriesInput').value = '';
+                commitToCloud();
+            }
+        }
+
+        function removeTradeSeries(seriesName) {
+            window.tradeDB[window.activeProfile] = window.tradeDB[window.activeProfile].filter(s => s !== seriesName);
+            commitToCloud();
+        }
+
+        function renderTradeSeries() {
+            const container = document.getElementById('tradeSeriesContainer');
+            if(!container) return;
+            container.innerHTML = '';
+            if (!window.tradeDB[window.activeProfile] || window.tradeDB[window.activeProfile].length === 0) {
+                container.innerHTML = `<span style="color:var(--text-muted); font-size: 0.85rem;">No series currently marked for trade.</span>`;
+                return;
+            }
+
+            window.tradeDB[window.activeProfile].forEach(s => {
+                const tag = document.createElement('div');
+                tag.className = 'trade-tag';
+                const safeSeries = s.replace(/'/g, "\\'");
+                tag.innerHTML = `<span>${s}</span> <button onclick="removeTradeSeries('${safeSeries}')">✖</button>`;
+                container.appendChild(tag);
+            });
+        }
+
+        function deleteCharacter(name, series) {
+            if(confirm(`Remove ${name} from your cloud collection?`)) {
+                window.db[window.activeProfile] = window.db[window.activeProfile].filter(c => !(c.name === name && c.series === series));
+                commitToCloud();
+            }
+        }
+
+        // --- Gallery Filtering & Presentation ---
+        function applyFilters() {
+            if (!window.activeProfile || !window.db[window.activeProfile]) return;
+            
+            const totalKa = window.db[window.activeProfile].reduce((sum, c) => sum + c.kakera, 0);
+            
+            const statCountEl = document.getElementById('statCount');
+            const statValueEl = document.getElementById('statValue');
+            if(statCountEl) statCountEl.innerText = window.db[window.activeProfile].length;
+            if(statValueEl) statValueEl.innerText = totalKa.toLocaleString() + ' ka';
+
+            const qName = document.getElementById('searchName') ? document.getElementById('searchName').value.toLowerCase() : '';
+            const qSeries = document.getElementById('searchSeries') ? document.getElementById('searchSeries').value.toLowerCase() : '';
+            const minK = (document.getElementById('minKa') && document.getElementById('minKa').value) ? parseInt(document.getElementById('minKa').value) : 0;
+            const maxK = (document.getElementById('maxKa') && document.getElementById('maxKa').value) ? parseInt(document.getElementById('maxKa').value) : 999999;
+            const sort = document.getElementById('sortBy') ? document.getElementById('sortBy').value : 'ka-desc';
+            const showTradeOnly = document.getElementById('filterTradeOnly') ? document.getElementById('filterTradeOnly').checked : false;
+            
+            const wishlistInputEl = document.getElementById('wishlistInput');
+            const rawWishlist = wishlistInputEl ? wishlistInputEl.value.toLowerCase() : '';
+            const wishlistArray = rawWishlist.split(/[,|\n]+/).map(w => w.trim()).filter(w => w.length > 0);
+            
+            const activeTradeSeries = (window.tradeDB[window.activeProfile] || []).map(s => s.toLowerCase());
+
+            filteredData = window.db[window.activeProfile].map(c => {
+                const isWished = wishlistArray.some(w => c.name.toLowerCase() === w);
+                const isForTrade = activeTradeSeries.includes(c.series.toLowerCase());
+                return {...c, isWished, isForTrade}; 
+            }).filter(c => {
+                let matches = c.name.toLowerCase().includes(qName) &&
+                              c.series.toLowerCase().includes(qSeries) &&
+                              c.kakera >= minK && c.kakera <= maxK;
+                
+                if (showTradeOnly) matches = matches && c.isForTrade;
+                
+                return matches;
+            });
+
+            if (sort === 'ka-desc') filteredData.sort((a,b) => (b.kakera - a.kakera) || a.name.localeCompare(b.name));
+            if (sort === 'ka-asc') filteredData.sort((a,b) => (a.kakera - b.kakera) || a.name.localeCompare(b.name));
+            if (sort === 'alpha') filteredData.sort((a,b) => a.name.localeCompare(b.name));
+
+            filteredData.sort((a, b) => (a.isWished === b.isWished) ? 0 : a.isWished ? -1 : 1);
+
+            const resultCountEl = document.getElementById('resultCount');
+            if (resultCountEl) resultCountEl.innerText = `${filteredData.length} characters found`;
+            
+            renderGallery();
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderGallery();
+        }
+
+        function renderGallery() {
+            const grid = document.getElementById('characterGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+            if(currentPage > totalPages) currentPage = totalPages;
+            if(currentPage < 1) currentPage = 1;
+
+            const pageIndicatorEl = document.getElementById('pageIndicator');
+            const prevBtnEl = document.getElementById('prevBtn');
+            const nextBtnEl = document.getElementById('nextBtn');
+
+            if(pageIndicatorEl) pageIndicatorEl.innerText = `Page ${currentPage} of ${totalPages}`;
+            if(prevBtnEl) prevBtnEl.disabled = currentPage === 1;
+            if(nextBtnEl) nextBtnEl.disabled = currentPage === totalPages;
+
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const paginatedItems = filteredData.slice(start, end);
+
+            paginatedItems.forEach(char => {
+                const card = document.createElement('div');
+                card.className = `card ${char.isWished ? 'is-wished' : ''} ${char.isForTrade ? 'is-trade' : ''}`;
+                const cardId = `card-${char.name.replace(/[^a-z0-9]/gi, '_')}_${char.series.replace(/[^a-z0-9]/gi, '_')}`;
+                
+                card.innerHTML = `
+                    <button class="delete-char" title="Remove character" onclick="deleteCharacter('${char.name.replace(/'/g, "\\'")}', '${char.series.replace(/'/g, "\\'")}')">✖</button>
+                    ${char.isWished ? '<span class="badge badge-wished">WISHED</span>' : ''}
+                    ${char.isForTrade ? '<span class="badge badge-trade">🤝 TRADE</span>' : ''}
+                    <div id="${cardId}-img" class="card-img-placeholder">Loading...</div>
+                    <div class="card-name">${char.name}</div>
+                    <div class="card-series">${char.series}</div>
+                    <div class="card-ka">💎 ${char.kakera} ka</div>
+                    ${char.keys ? `<div class="card-keys">🗝️ ${char.keys}</div>` : ''}
+                    ${char.tags ? `<div class="card-tags">${char.tags}</div>` : ''}
+                `;
+                grid.appendChild(card);
+
+                // Fetch image from proxy
+                const cleanName = char.name.replace(/·/g, '').replace(/\s+/g, ' ').trim();
+                const cacheKey = `mudae-img:${cleanName}`;
+                const cached = sessionStorage.getItem(cacheKey);
+                const imgEl = document.getElementById(`${cardId}-img`);
+
+                if (cached) {
+                    if (cached === 'none') {
+                        if (imgEl) imgEl.style.display = 'none';
+                    } else {
+                        if (imgEl) imgEl.outerHTML = `<img class="card-img" src="${cached}" alt="${char.name}">`;
+                    }
+                } else {
+                    const proxyUrl = `https://mudae-eight.vercel.app/api/mudae?name=${encodeURIComponent(cleanName)}&series=${encodeURIComponent(char.series)}`;
+                    const testImg = new Image();
+                    testImg.onload = () => {
+                        sessionStorage.setItem(cacheKey, proxyUrl);
+                        const el = document.getElementById(`${cardId}-img`);
+                        if (el) el.outerHTML = `<img class="card-img" src="${proxyUrl}" alt="${char.name}">`;
+                    };
+                    testImg.onerror = () => {
+                        sessionStorage.setItem(cacheKey, 'none');
+                        const el = document.getElementById(`${cardId}-img`);
+                        if (el) el.style.display = 'none';
+                    };
+                    testImg.src = proxyUrl;
+                }
+            });
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mudae Cloud Manager</title>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        // Your exact Firebase project credentials
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFMSDydDFdLlblDqaAQ4IpoyKGtTrdvxc",
+            authDomain: "mudae-hub.firebaseapp.com",
+            projectId: "mudae-hub",
+            storageBucket: "mudae-hub.firebasestorage.app",
+            messagingSenderId: "1055802189217",
+            appId: "1:1055802189217:web:ef413ea00a67ce3e1597e0",
+            measurementId: "G-KQGF2G2958"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const firestore = getFirestore(app);
+
+        window.saveToCloud = (charactersData, tradeTagsData) => {
+            const statusEl = document.getElementById('cloudStatus');
+            if(statusEl) { statusEl.innerText = "🟡 Syncing..."; statusEl.style.color = "#f1c40f"; }
+            
+            setDoc(doc(firestore, "mudaeData", "sharedCollection"), {
+                characters: charactersData,
+                tradeTags: tradeTagsData
+            }).then(() => {
+                if(statusEl) { statusEl.innerText = "🟢 Cloud Synced"; statusEl.style.color = "var(--success)"; }
+            }).catch((err) => {
+                console.error(err);
+                if(statusEl) { statusEl.innerText = "🔴 Sync Error"; statusEl.style.color = "var(--danger)"; }
+            });
+        };
+
+        // Live stream cloud updates straight to the UI
+        onSnapshot(doc(firestore, "mudaeData", "sharedCollection"), (snapshot) => {
+            const statusEl = document.getElementById('cloudStatus');
+            if(statusEl) { statusEl.innerText = "🟢 Cloud Synced"; statusEl.style.color = "var(--success)"; }
+
+            if (snapshot.exists()) {
+                const cloudData = snapshot.data();
+                window.db = cloudData.characters || {};
+                window.tradeDB = cloudData.tradeTags || {};
+            } else {
+                window.db = {};
+                window.tradeDB = {};
+            }
+            
+            if (!window.activeProfile && Object.keys(window.db).length > 0) {
+                window.activeProfile = Object.keys(window.db)[0];
+            }
+            
+            window.syncUIWithCloud();
+        }, (error) => {
+            console.error("Firebase Snapshot Error:", error);
+            const statusEl = document.getElementById('cloudStatus');
+            if(statusEl) { statusEl.innerText = "🔴 Database Blocked (Check Firebase Rules)"; statusEl.style.color = "var(--danger)"; }
+        });
+    </script>
+
+    <style>
+        :root {
+            --bg-base: #0f0f13;
+            --bg-panel: #1a1a24;
+            --bg-card: #252530;
+            --primary: #5865F2;
+            --primary-hover: #4752c4;
+            --danger: #ed4245;
+            --success: #23a55a;
+            --trade: #e67e22;
+            --text-main: #f2f3f5;
+            --text-muted: #949ba4;
+            --kakera: #00e5ff;
+            --wishlist: #ff3e6c;
+            --tags: #f1c40f;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg-base); color: var(--text-main); }
+        
+        nav { background: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2f3136; flex-wrap: wrap; gap: 1rem;}
+        nav h1 { color: var(--primary); font-size: 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-links button { background: none; border: none; color: var(--text-muted); font-size: 1rem; cursor: pointer; padding: 0.5rem 1rem; border-radius: 6px; transition: 0.2s; }
+        .nav-links button:hover, .nav-links button.active { color: white; background: #2f3136; }
+
+        .container { max-width: 1400px; margin: 2rem auto; padding: 0 1rem; }
+        .view { display: none; }
+        .view.active { display: block; }
+
+        .panel { background: var(--bg-panel); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #2f3136; }
+        .panel h2 { margin-bottom: 1rem; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;}
+        
+        input, select, textarea { width: 100%; padding: 0.8rem; background: var(--bg-card); border: 1px solid #3f3f4e; color: white; border-radius: 8px; margin-bottom: 1rem; }
+        textarea { height: 150px; resize: vertical; font-family: monospace; }
+        
+        button.btn { background: var(--primary); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button.btn:hover { background: var(--primary-hover); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-trade { background: var(--trade); }
+        button.btn-trade:hover { background: #d35400; }
+        button.btn-small { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+
+        .profile-list { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+        .profile-badge { background: var(--bg-card); padding: 0.8rem 1.5rem; border-radius: 8px; display: flex; align-items: center; gap: 1rem; border: 1px solid #3f3f4e; cursor: pointer;}
+        .profile-badge.selected { border-color: var(--primary); background: rgba(88, 101, 242, 0.1); }
+        .profile-badge button { background: var(--danger); border: none; color: white; border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: 0.2s;}
+        .profile-badge button:hover { background: #ff5255; transform: scale(1.1); }
+
+        .dashboard-stats { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;}
+        .stat-box { background: var(--bg-card); padding: 1rem; border-radius: 8px; flex: 1; min-width: 200px; text-align: center; border: 1px solid #3f3f4e; }
+        .stat-box span { display: block; font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-top: 0.5rem; }
+
+        .filter-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; align-items: center;}
+        .checkbox-container { display: flex; align-items: center; gap: 0.5rem; background: var(--bg-card); padding: 0.8rem; border-radius: 8px; border: 1px solid #3f3f4e; cursor: pointer;}
+        .checkbox-container input { width: auto; margin: 0; cursor: pointer;}
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+        .card { background: var(--bg-card); padding: 1.2rem; border-radius: 8px; border-left: 4px solid var(--primary); position: relative; transition: transform 0.2s; padding-bottom: 2rem;}
+        .card:hover { transform: translateY(-3px); }
+        .card.is-wished { border-left-color: var(--wishlist); background: rgba(255, 62, 108, 0.05); }
+        .card.is-trade { border-left-color: var(--trade); }
+        .card.is-wished.is-trade { border-left-color: var(--wishlist); border-right: 4px solid var(--trade); }
+        
+        .card-name { font-weight: bold; font-size: 1.1rem; padding-right: 20px; word-break: break-word; line-height: 1.2;}
+        .card-series { font-size: 0.85rem; color: var(--text-muted); margin: 0.4rem 0 0.8rem 0; word-break: break-word; line-height: 1.3;}
         .card-img { width: 100%; height: 180px; object-fit: cover; border-radius: 6px; margin-bottom: 0.8rem; background: #2a2a3a; display: block; }
         .card-img-placeholder { width: 100%; height: 180px; border-radius: 6px; margin-bottom: 0.8rem; background: #2a2a3a; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; }
         .card-ka { color: var(--kakera); font-weight: bold; font-size: 0.9rem;}
