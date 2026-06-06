@@ -15,11 +15,12 @@ export default async function handler(req, res) {
 
         const html = await searchRes.text();
 
-        // Extract character link, excluding utility pages like arrange-images
-        const charLinkMatch = html.match(/href="(\/character\/\d+\/(?!arrange-images)[^"]+)"/);
-        if (!charLinkMatch) return res.status(404).json({ error: 'Character not found' });
+        // Extract character ID from search results
+        const charIdMatch = html.match(/\/character\/(\d+)\//);
+        if (!charIdMatch) return res.status(404).json({ error: 'Character not found' });
 
-        const charUrl = `https://mudae.net${charLinkMatch[1]}`;
+        const charId = charIdMatch[1];
+        const charUrl = `https://mudae.net/character/${charId}/${encodeURIComponent(name)}`;
         const charRes = await fetch(charUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
