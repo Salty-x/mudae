@@ -129,6 +129,8 @@
         
         .card-name { font-weight: bold; font-size: 1.1rem; padding-right: 20px; word-break: break-word; line-height: 1.2;}
         .card-series { font-size: 0.85rem; color: var(--text-muted); margin: 0.4rem 0 0.8rem 0; word-break: break-word; line-height: 1.3;}
+        .card-img { width: 100%; height: 180px; object-fit: cover; border-radius: 6px; margin-bottom: 0.8rem; background: #2a2a3a; display: block; }
+        .card-img-placeholder { width: 100%; height: 180px; border-radius: 6px; margin-bottom: 0.8rem; background: #2a2a3a; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; }
         .card-ka { color: var(--kakera); font-weight: bold; font-size: 0.9rem;}
         .card-keys { color: #f1c40f; font-size: 0.85rem; margin-top: 0.3rem; }
         .card-tags { color: var(--tags); font-size: 0.85rem; margin-top: 0.5rem; font-weight: bold; }
@@ -585,11 +587,13 @@
             paginatedItems.forEach(char => {
                 const card = document.createElement('div');
                 card.className = `card ${char.isWished ? 'is-wished' : ''} ${char.isForTrade ? 'is-trade' : ''}`;
+                const cardId = `card-${char.name.replace(/[^a-z0-9]/gi, '_')}_${char.series.replace(/[^a-z0-9]/gi, '_')}`;
                 
                 card.innerHTML = `
                     <button class="delete-char" title="Remove character" onclick="deleteCharacter('${char.name.replace(/'/g, "\\'")}', '${char.series.replace(/'/g, "\\'")}')">✖</button>
                     ${char.isWished ? '<span class="badge badge-wished">WISHED</span>' : ''}
                     ${char.isForTrade ? '<span class="badge badge-trade">🤝 TRADE</span>' : ''}
+                    <div id="${cardId}-img" class="card-img-placeholder">Loading...</div>
                     <div class="card-name">${char.name}</div>
                     <div class="card-series">${char.series}</div>
                     <div class="card-ka">💎 ${char.kakera} ka</div>
@@ -597,6 +601,38 @@
                     ${char.tags ? `<div class="card-tags">${char.tags}</div>` : ''}
                 `;
                 grid.appendChild(card);
+
+                // Fetch image from proxy
+                const cacheKey = `mudae-img:${char.name}`;
+                const cached = sessionStorage.getItem(cacheKey);
+                const imgEl = document.getElementById(`${cardId}-img`);
+
+                if (cached) {
+                    if (cached === 'none') {
+                        if (imgEl) imgEl.style.display = 'none';
+                    } else {
+                        if (imgEl) { imgEl.outerHTML = `<img class="card-img" src="${cached}" alt="${char.name}" onerror="this.style.display='none'">`; }
+                    }
+                } else {
+                    fetch(`https://mudae-eight.vercel.app/api/mudae?name=${encodeURIComponent(char.name)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.image) {
+                                sessionStorage.setItem(cacheKey, data.image);
+                                const el = document.getElementById(`${cardId}-img`);
+                                if (el) el.outerHTML = `<img class="card-img" src="${data.image}" alt="${char.name}" onerror="this.style.display='none'">`;
+                            } else {
+                                sessionStorage.setItem(cacheKey, 'none');
+                                const el = document.getElementById(`${cardId}-img`);
+                                if (el) el.style.display = 'none';
+                            }
+                        })
+                        .catch(() => {
+                            sessionStorage.setItem(cacheKey, 'none');
+                            const el = document.getElementById(`${cardId}-img`);
+                            if (el) el.style.display = 'none';
+                        });
+                }
             });
         }
     </script>
