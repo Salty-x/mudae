@@ -15,8 +15,8 @@ export default async function handler(req, res) {
 
         const html = await searchRes.text();
 
-        // Extract first character link from search results
-        const charLinkMatch = html.match(/href="(\/character\/\d+\/[^"]+)"/);
+        // Extract character link, excluding utility pages like arrange-images
+        const charLinkMatch = html.match(/href="(\/character\/\d+\/(?!arrange-images)[^"]+)"/);
         if (!charLinkMatch) return res.status(404).json({ error: 'Character not found' });
 
         const charUrl = `https://mudae.net${charLinkMatch[1]}`;
