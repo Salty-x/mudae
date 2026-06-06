@@ -603,7 +603,8 @@
                 grid.appendChild(card);
 
                 // Fetch image from proxy
-                const cacheKey = `mudae-img:${char.name}`;
+                const cleanName = char.name.replace(/·/g, '').replace(/\s+/g, ' ').trim();
+                const cacheKey = `mudae-img:${cleanName}`;
                 const cached = sessionStorage.getItem(cacheKey);
                 const imgEl = document.getElementById(`${cardId}-img`);
 
@@ -611,27 +612,22 @@
                     if (cached === 'none') {
                         if (imgEl) imgEl.style.display = 'none';
                     } else {
-                        if (imgEl) { imgEl.outerHTML = `<img class="card-img" src="${cached}" alt="${char.name}" onerror="this.style.display='none'">`; }
+                        if (imgEl) imgEl.outerHTML = `<img class="card-img" src="${cached}" alt="${char.name}">`;
                     }
                 } else {
-                    fetch(`https://mudae-eight.vercel.app/api/mudae?name=${encodeURIComponent(char.name)}`)
-                        .then(r => r.json())
-                        .then(data => {
-                            if (data.image) {
-                                sessionStorage.setItem(cacheKey, data.image);
-                                const el = document.getElementById(`${cardId}-img`);
-                                if (el) el.outerHTML = `<img class="card-img" src="${data.image}" alt="${char.name}" onerror="this.style.display='none'">`;
-                            } else {
-                                sessionStorage.setItem(cacheKey, 'none');
-                                const el = document.getElementById(`${cardId}-img`);
-                                if (el) el.style.display = 'none';
-                            }
-                        })
-                        .catch(() => {
-                            sessionStorage.setItem(cacheKey, 'none');
-                            const el = document.getElementById(`${cardId}-img`);
-                            if (el) el.style.display = 'none';
-                        });
+                    const proxyUrl = `https://mudae-eight.vercel.app/api/mudae?name=${encodeURIComponent(cleanName)}&series=${encodeURIComponent(char.series)}`;
+                    const testImg = new Image();
+                    testImg.onload = () => {
+                        sessionStorage.setItem(cacheKey, proxyUrl);
+                        const el = document.getElementById(`${cardId}-img`);
+                        if (el) el.outerHTML = `<img class="card-img" src="${proxyUrl}" alt="${char.name}">`;
+                    };
+                    testImg.onerror = () => {
+                        sessionStorage.setItem(cacheKey, 'none');
+                        const el = document.getElementById(`${cardId}-img`);
+                        if (el) el.style.display = 'none';
+                    };
+                    testImg.src = proxyUrl;
                 }
             });
         }
