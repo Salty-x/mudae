@@ -436,6 +436,16 @@
         document.documentElement.style.setProperty('--accent-dim', hexColor + '25');
     }
 
+    async function changeProfileColor(profileName, hex) {
+        if (!window.profileMeta[profileName]) window.profileMeta[profileName] = {};
+        window.profileMeta[profileName].theme = hex;
+        applyTheme(hex);
+        // Update card border/name color live
+        refreshProfilesTab();
+        // Persist to cloud
+        try { await window.saveToCloud(); } catch(e) {}
+    }
+
     // ── Interest color ──
     function setInterestColor(hex) {
         document.documentElement.style.setProperty('--interest-color', hex);
@@ -642,6 +652,10 @@
                 <div class="p-name" style="color: ${pColor}">${name}</div>
                 <div class="p-count">${count} characters</div>
                 ${isMe ? `<div class="p-btn-row">
+                    <label title="Change profile color" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.72rem;font-weight:700;color:var(--muted);" onclick="event.stopPropagation()">
+                        <input type="color" value="${pColor}" style="width:22px;height:22px;padding:1px;border-radius:50%;cursor:pointer;border:2px solid var(--border);" oninput="event.stopPropagation();changeProfileColor('${name}', this.value)">
+                        Color
+                    </label>
                     <button class="btn btn-red btn-sm" onclick="event.stopPropagation();deleteProfile('${name}')">Delete</button>
                 </div>` : 
                 (!hasPin ? `<div class="p-btn-row">
