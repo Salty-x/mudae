@@ -402,9 +402,24 @@
                 🌍 Global Market & Search
                 <button class="toggle-btn btn-sm" onclick="toggleCompactMode('globalGrid')" style="padding: 4px 8px; font-size: 0.7rem;">🖼️ / 📄</button>
             </div>
-            <p class="muted-msg" style="margin-bottom:12px;">Search for any character across all profiles to see who owns it. Leave blank to browse all "For Trade" items.</p>
-            <input type="text" id="globalSearch" placeholder="🔎 Search character or series globally..." oninput="applyGlobalFilters()" style="margin-bottom: 1rem; border-color: var(--orange);">
-            
+            <p class="muted-msg" style="margin-bottom:12px;">Search for any character across all profiles. Leave blank to browse all "For Trade" items.</p>
+
+            <div class="filters" style="margin-bottom:8px;">
+                <input type="text" id="globalSearch"    placeholder="🔎 Character or series..." oninput="applyGlobalFilters()" style="border-color:var(--orange);">
+                <input type="text" id="gfRoll"          placeholder="🔎 Roll type (ha, wa...)"   oninput="applyGlobalFilters()">
+                <input type="number" id="gfMinKa"       placeholder="Min 💎 ka"  min="0"          oninput="applyGlobalFilters()">
+                <input type="number" id="gfMaxKa"       placeholder="Max 💎 ka"  min="0"          oninput="applyGlobalFilters()">
+                <select id="gfSort" onchange="applyGlobalFilters()">
+                    <option value="ka-desc">💎 Ka: High → Low</option>
+                    <option value="ka-asc">💎 Ka: Low → High</option>
+                    <option value="alpha">🔤 A → Z</option>
+                    <option value="keys-desc">🗝️ Keys: Most first</option>
+                </select>
+                <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:700;color:var(--orange);white-space:nowrap;">
+                    <input type="checkbox" id="gfTradeOnly" onchange="applyGlobalFilters()" style="width:16px;height:16px;margin:0;"> For Trade only
+                </label>
+            </div>
+
             <div class="result-count" id="globalResultCount">— characters found</div>
             <div class="char-grid" id="globalGrid"></div>
             <div class="pager">
@@ -860,7 +875,14 @@
 
     // ── Global Market View ──
     function applyGlobalFilters() {
-        const q = document.getElementById('globalSearch')?.value.toLowerCase()||'';
+        const q         = document.getElementById('globalSearch')?.value.toLowerCase()||'';
+        const rollQ     = document.getElementById('gfRoll')?.value.toLowerCase().replace(/\s/g,'')||'';
+        const minKa     = parseInt(document.getElementById('gfMinKa')?.value)||0;
+        const maxKa     = parseInt(document.getElementById('gfMaxKa')?.value)||Infinity;
+        const sort      = document.getElementById('gfSort')?.value||'ka-desc';
+        const tradeOnly = document.getElementById('gfTradeOnly')?.checked||false;
+        const hasSearch = q !== '' || rollQ !== '' || minKa > 0 || maxKa < Infinity;
+
         let allMarketChars = [];
         const myInt = window.activeProfile ? getInterests(window.activeProfile).map(s=>s.toLowerCase()) : [];
         const wl = window.activeProfile ? (document.getElementById('wishlistInput')?.value.toLowerCase()||'').split(/[,|\n]+/).map(w=>w.trim()).filter(Boolean) : [];
@@ -869,18 +891,24 @@
             const ownerTradeItems = (window.tradeDB[owner] || []).map(s=>s.toLowerCase());
             window.db[owner].forEach(c => {
                 const ann = annotateCharacter(c, ownerTradeItems, myInt, wl, owner);
-                if (q !== '') {
-                    // Search mode: match name OR series, show all regardless of trade status
-                    if (ann.name.toLowerCase().includes(q) || ann.series.toLowerCase().includes(q)) allMarketChars.push(ann);
-                } else {
-                    // Browse mode: show only For Trade items
-                    if (ann.isForTrade) allMarketChars.push(ann);
-                }
+
+                // Trade filter: in browse mode (no search) default to trade only; checkbox overrides
+                if (!hasSearch || tradeOnly) { if (!ann.isForTrade) return; }
+
+                // Text search: name or series
+                if (q && !ann.name.toLowerCase().includes(q) && !ann.series.toLowerCase().includes(q)) return;
+
+                // Roll type filter
+                if (rollQ && !(ann.rollTypes||[]).some(r=>r.toLowerCase().includes(rollQ))) return;
+
+                // Kakera range
+                if (ann.kakera < minKa || ann.kakera > maxKa) return;
+
+                allMarketChars.push(ann);
             });
         }
 
-        // Default sort by Ka
-        allMarketChars.sort((a,b)=>(b.kakera-a.kakera)||a.name.localeCompare(b.name));
+        sortData(allMarketChars, sort);
         globalFiltered = allMarketChars;
         document.getElementById('globalResultCount').textContent = `${globalFiltered.length} characters found globally`;
         globalPage = 1;
