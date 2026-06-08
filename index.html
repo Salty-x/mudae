@@ -187,9 +187,14 @@
         .char-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         .char-card.wished { border-color: rgba(232,121,160,0.5); border-left-color: var(--pink); }
         .char-card.for-trade { border-color: rgba(230,126,34,0.4); border-left-color: var(--orange); }
-        .char-card.not-trade { opacity: 0.6; border-left-color: var(--muted); }
-        .char-img { width: 100%; display: block; }
-        .char-img-ph { width: 100%; height: 20px; background: var(--bg3); }
+        .char-card.interested { background: color-mix(in srgb, var(--interest-color, #a78bfa) 10%, var(--bg2)); border-color: color-mix(in srgb, var(--interest-color, #a78bfa) 35%, transparent); border-left-color: var(--interest-color, #a78bfa); }
+        .cbadge-interest { background: color-mix(in srgb, var(--interest-color, #a78bfa) 18%, transparent); color: var(--interest-color, #a78bfa); border: 1px solid color-mix(in srgb, var(--interest-color, #a78bfa) 40%, transparent); }
+        .char-card .img-wrap { position: relative; overflow: hidden; width: 100%; aspect-ratio: 3/4; background: var(--bg3); }
+        .char-img { position: absolute; inset: -8%; width: 116%; height: 116%; display: block; object-fit: cover; }
+        .char-img-ph { width: 100%; height: 100%; background: var(--bg3); }
+        .del-btn { position: absolute; top: 6px; right: 6px; z-index: 10; background: rgba(0,0,0,0.45); border: none; color: rgba(255,255,255,0.75); font-size: 0.8rem; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: background 0.15s, color 0.15s; line-height: 1; padding: 0; }
+        .del-btn:hover { background: rgba(237,66,69,0.75); color: #fff; }
+        .del-btn.hidden { display: none; }
         .char-body { padding: 10px 12px 12px; }
         .char-name { font-weight: 900; font-size: 0.9rem; line-height: 1.2; margin-bottom: 2px; padding-right: 18px; }
         .char-series { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; line-height: 1.3; }
@@ -207,8 +212,9 @@
         /* ─── COMPACT VIEW (LIST VIEW) ─── */
         .char-grid.compact-mode { grid-template-columns: 1fr; gap: 8px; }
         .compact-mode .char-card { display: flex; align-items: center; padding: 8px 12px; }
-        .compact-mode .char-img-ph { width: 40px; height: 40px; flex-shrink: 0; margin-right: 12px; border-radius: 4px; }
-        .compact-mode .char-img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-right: 12px;}
+        .compact-mode .char-img-ph { width: 40px; height: 40px; aspect-ratio: unset; flex-shrink: 0; margin-right: 12px; border-radius: 4px; }
+        .compact-mode .char-img { width: 40px; height: 40px; aspect-ratio: unset; object-fit: cover; border-radius: 4px; margin-right: 12px;}
+        .compact-mode .img-wrap { flex-shrink: 0; margin-right: 12px; width: 40px; height: 40px; }
         .compact-mode .char-body { padding: 0; display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 16px; }
         .compact-mode .char-name { margin: 0; font-size: 1rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .compact-mode .char-series { margin: 0; font-size: 0.8rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
@@ -343,7 +349,12 @@
         </div>
 
         <div class="box" style="border-color:rgba(184,169,245,0.2); background:rgba(184,169,245,0.03);">
-            <div class="box-title" style="color:var(--purple);">⭐ My Private Interests</div>
+            <div class="box-title" style="color:var(--purple);">⭐ My Private Interests
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="font-size:0.72rem;font-weight:700;color:var(--muted);">Card color:</label>
+                    <input type="color" id="interestColorPicker" value="#a78bfa" style="width:32px;height:26px;padding:2px;margin:0;cursor:pointer;border-radius:6px;" oninput="setInterestColor(this.value)">
+                </div>
+            </div>
             <div style="display: flex; gap: 10px;">
                 <input type="text" id="interestInput" placeholder="Tag a series/character you want..." style="margin-bottom:0; flex:1;" onkeydown="if(event.key==='Enter')addInterest()">
                 <button class="btn btn-outline btn-sm" onclick="addInterest()" style="align-self:center;">Add</button>
@@ -424,6 +435,20 @@
         document.documentElement.style.setProperty('--accent', hexColor);
         document.documentElement.style.setProperty('--accent-dim', hexColor + '25');
     }
+
+    // ── Interest color ──
+    function setInterestColor(hex) {
+        document.documentElement.style.setProperty('--interest-color', hex);
+        localStorage.setItem('mudae_interest_color', hex);
+    }
+    (function loadInterestColor() {
+        const saved = localStorage.getItem('mudae_interest_color');
+        if (saved) {
+            document.documentElement.style.setProperty('--interest-color', saved);
+            const picker = document.getElementById('interestColorPicker');
+            if (picker) picker.value = saved;
+        }
+    })();
 
     // ── Interest tags (localStorage) ──
     const iKey = p => `mudae_int_${p}`;
@@ -562,6 +587,9 @@
 
     window.syncUIWithCloud = () => {
         if (!window.activeProfile && Object.keys(window.db).length > 0) window.activeProfile = Object.keys(window.db)[0];
+        // Restore interest color picker value
+        const savedColor = localStorage.getItem('mudae_interest_color');
+        if (savedColor) { const p = document.getElementById('interestColorPicker'); if(p) p.value = savedColor; }
         refreshProfilesTab();
         if(document.getElementById('view-gallery').classList.contains('active')) {
             populateGallerySelect(); renderInterests(); applyFilters();
@@ -827,10 +855,11 @@
             const ownerTradeItems = (window.tradeDB[owner] || []).map(s=>s.toLowerCase());
             window.db[owner].forEach(c => {
                 const ann = annotateCharacter(c, ownerTradeItems, myInt, wl, owner);
-                // If searching, show matches regardless of trade status. If empty, show ONLY For Trade.
-                if (q !== "") {
+                if (q !== '') {
+                    // Search mode: match name OR series, show all regardless of trade status
                     if (ann.name.toLowerCase().includes(q) || ann.series.toLowerCase().includes(q)) allMarketChars.push(ann);
                 } else {
+                    // Browse mode: show only For Trade items
                     if (ann.isForTrade) allMarketChars.push(ann);
                 }
             });
@@ -874,15 +903,17 @@
 
         slice.forEach(char=>{
             const card = document.createElement('div');
-            const cls = ['char-card', char.isWished?'wished':'', char.isForTrade?'for-trade': (!char.isForTrade && containerId === 'globalGrid') ? 'not-trade' : ''].filter(Boolean).join(' ');
+            const cls = ['char-card', char.isWished?'wished':'', char.isForTrade?'for-trade':'', char.isInterested?'interested':''].filter(Boolean).join(' ');
             card.className = cls;
             const cid = 'c_'+(char.owner+char.name+char.series).replace(/[^a-z0-9]/gi,'_');
 
             let rollBadges = (char.rollTypes || []).map(rt => `<span class="cbadge cbadge-roll">${rt}</span>`).join(' ');
 
             card.innerHTML=`
-                <button class="del-btn${isOwnerViewingOwn?'':' hidden'}" onclick="delChar('${char.name.replace(/'/g,"\\'")}','${char.series.replace(/'/g,"\\'")}')">✕</button>
-                <div id="${cid}" class="char-img-ph"></div>
+                <div class="img-wrap">
+                    <button class="del-btn${isOwnerViewingOwn?'':' hidden'}" onclick="delChar('${char.name.replace(/'/g,"\\'")}','${char.series.replace(/'/g,"\\'")}')">✕</button>
+                    <div id="${cid}" class="char-img-ph"></div>
+                </div>
                 <div class="char-body">
                     <div class="char-name">${char.name}</div>
                     <div class="char-series">${char.series}</div>
@@ -892,8 +923,8 @@
                     </div>
                     <div class="char-badges">
                         ${containerId === 'globalGrid' ? `<span class="cbadge cbadge-owner">👤 ${char.owner}</span>` : ''}
-                        ${(!char.isForTrade && containerId === 'globalGrid') ? '<span class="cbadge" style="background:var(--bg3); color:var(--muted)">🔒 Not For Trade</span>' : ''}
                         ${rollBadges}
+                        ${char.isInterested?'<span class="cbadge cbadge-interest">⭐ Interested</span>':''}
                         ${char.isWished?'<span class="cbadge cbadge-wished">Wished</span>':''}
                         ${char.isForTrade?'<span class="cbadge cbadge-trade">For Trade</span>':''}
                     </div>
@@ -901,7 +932,7 @@
             grid.appendChild(card);
 
             const clean = char.name.replace(/·/g,'').replace(/\s+/g,' ').trim();
-            const show = url=>{const el=document.getElementById(cid);if(el)el.outerHTML=`<img class="char-img" src="${url}" alt="${char.name}">`;};
+            const show = url=>{const el=document.getElementById(cid);if(el){const img=document.createElement('img');img.className='char-img';img.src=url;img.alt=char.name;el.replaceWith(img);}};
             const hide = ()=>{const el=document.getElementById(cid);if(el)el.style.display='none';};
             window.getImageFromCache(clean).then(c=>{
                 if(c==='none'){hide();return;}
