@@ -200,6 +200,13 @@
         .char-card:hover .trade-toggle-btn { opacity: 1; pointer-events: auto; }
         .trade-toggle-btn.active { opacity: 1; pointer-events: auto; background: rgba(230,126,34,0.7); color: #fff; }
         .trade-toggle-btn:hover { background: rgba(230,126,34,0.8); transform: scale(1.1); }
+        .fav-btn { position: absolute; bottom: 6px; left: 6px; z-index: 10; background: rgba(0,0,0,0.45); border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: background 0.15s, transform 0.15s, opacity 0.15s; line-height: 1; padding: 0; opacity: 0; pointer-events: none; }
+        .char-card:hover .fav-btn { opacity: 1; pointer-events: auto; }
+        .fav-btn.active { opacity: 1; pointer-events: auto; background: rgba(232,60,80,0.75); color: #fff; }
+        .fav-btn:hover { background: rgba(232,60,80,0.85); transform: scale(1.1); }
+        .char-card.favorited { border-left-color: #ff4d6d !important; }
+        .char-card.favorited .img-wrap::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,77,109,0.08) 0%, transparent 60%); pointer-events: none; }
+        .cbadge-fav { background: rgba(255,77,109,0.15); color: #ff4d6d; border: 1px solid rgba(255,77,109,0.35); }
         .char-body { padding: 10px 12px 12px; }
         .char-name { font-weight: 900; font-size: 0.9rem; line-height: 1.2; margin-bottom: 2px; padding-right: 18px; }
         .char-series { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; line-height: 1.3; }
@@ -506,7 +513,49 @@
         el.innerHTML = arr.map(s => `<div class="tag-pill interest-pill"><span>${s}</span><button onclick="removeInterest('${s.replace(/'/g,"\\'")}')">✕</button></div>`).join('');
     }
 
-    // ── Modals ──
+    // ── Favorites (localStorage, owner-only, marks as NOT for trade) ──
+    const favKey = p => `mudae_fav_${p}`;
+    const getFavs = p => { try { return JSON.parse(localStorage.getItem(favKey(p)) || '[]'); } catch { return []; } };
+    const saveFavs = (p, a) => localStorage.setItem(favKey(p), JSON.stringify(a));
+
+    function toggleFavChar(name, series, btn) {
+        if (window.loggedInAs !== window.activeProfile) return;
+        const favs = getFavs(window.activeProfile);
+        const nameLow = name.toLowerCase();
+        const idx = favs.findIndex(f => f.toLowerCase() === nameLow);
+        const card = btn.closest('.char-card');
+        if (idx === -1) {
+            favs.push(name);
+            btn.classList.add('active');
+            btn.title = '💔 Unfavorite';
+            card.classList.add('favorited');
+            // Add badge if not present
+            const badges = card.querySelector('.char-badges');
+            if (badges && !badges.querySelector('.cbadge-fav')) {
+                const b = document.createElement('span');
+                b.className = 'cbadge cbadge-fav';
+                b.textContent = '♥ Not for Trade';
+                badges.prepend(b);
+            }
+            // Remove "For Trade" badge & styling if present
+            const tradeBadge = card.querySelector('.cbadge-trade');
+            if (tradeBadge) tradeBadge.style.opacity = '0.35';
+        } else {
+            favs.splice(idx, 1);
+            btn.classList.remove('active');
+            btn.title = '♥ Favorite (not for trade)';
+            card.classList.remove('favorited');
+            const favBadge = card.querySelector('.cbadge-fav');
+            if (favBadge) favBadge.remove();
+            // Restore trade badge opacity
+            const tradeBadge = card.querySelector('.cbadge-trade');
+            if (tradeBadge) tradeBadge.style.opacity = '';
+        }
+        saveFavs(window.activeProfile, favs);
+        applyFilters(false);
+    }
+
+
     let pendingLogin = null;
     function openLogin(profile) {
         pendingLogin = profile;
@@ -841,11 +890,15 @@
 
     // ── Core Gallery Logic ──
     function annotateCharacter(c, activeTradeItems, activeInterestItems, wlArray, ownerName) {
+        const ownerFavs = getFavs(ownerName).map(s => s.toLowerCase());
+        const isFavorited = ownerFavs.includes(c.name.toLowerCase());
+        const rawForTrade = activeTradeItems.includes(c.series.toLowerCase()) || activeTradeItems.includes(c.name.toLowerCase());
         return {
             ...c,
             owner: ownerName,
             isWished: wlArray.some(w=>c.name.toLowerCase()===w),
-            isForTrade: activeTradeItems.includes(c.series.toLowerCase()) || activeTradeItems.includes(c.name.toLowerCase()),
+            isFavorited,
+            isForTrade: rawForTrade && !isFavorited,
             isInterested: activeInterestItems.includes(c.series.toLowerCase()) || activeInterestItems.includes(c.name.toLowerCase())
         };
     }
@@ -953,7 +1006,7 @@
 
         slice.forEach(char=>{
             const card = document.createElement('div');
-            const cls = ['char-card', char.isWished?'wished':'', char.isForTrade?'for-trade':'', char.isInterested?'interested':''].filter(Boolean).join(' ');
+            const cls = ['char-card', char.isWished?'wished':'', char.isForTrade?'for-trade':'', char.isInterested?'interested':'', char.isFavorited?'favorited':''].filter(Boolean).join(' ');
             card.className = cls;
             const cid = 'c_'+(char.owner+char.name+char.series).replace(/[^a-z0-9]/gi,'_');
 
@@ -961,12 +1014,15 @@
 
             const canToggleTrade = window.loggedInAs === char.owner;
             const tradeLabel = char.isForTrade ? '🔓 Remove from trades' : '🤝 Add to trades';
+            const canFav = window.loggedInAs === char.owner;
+            const favLabel = char.isFavorited ? '💔 Unfavorite' : '♥ Favorite (not for trade)';
 
             card.innerHTML=`
                 <div class="img-wrap">
                     <button class="del-btn${isOwnerViewingOwn?'':' hidden'}" onclick="event.stopPropagation();delChar('${char.name.replace(/'/g,"\\'")}','${char.series.replace(/'/g,"\\'")}')">✕</button>
                     <div id="${cid}" class="char-img-ph"></div>
                     ${canToggleTrade ? `<button class="trade-toggle-btn${char.isForTrade?' active':''}" onclick="event.stopPropagation();toggleTradeChar('${char.name.replace(/'/g,"\\'")}','${char.series.replace(/'/g,"\\'")}',this)" title="${tradeLabel}">${char.isForTrade?'🤝':'＋'}</button>` : ''}
+                    ${canFav ? `<button class="fav-btn${char.isFavorited?' active':''}" onclick="event.stopPropagation();toggleFavChar('${char.name.replace(/'/g,"\\'")}','${char.series.replace(/'/g,"\\'")}',this)" title="${favLabel}">♥</button>` : ''}
                 </div>
                 <div class="char-body">
                     <div class="char-name">${char.name}</div>
@@ -979,6 +1035,7 @@
                         ${containerId === 'globalGrid' ? `<span class="cbadge cbadge-owner">👤 ${char.owner}</span>` : ''}
                         ${rollBadges}
                         ${char.isInterested?'<span class="cbadge cbadge-interest">⭐ Interested</span>':''}
+                        ${char.isFavorited?'<span class="cbadge cbadge-fav">♥ Not for Trade</span>':''}
                         ${char.isWished?'<span class="cbadge cbadge-wished">Wished</span>':''}
                         ${char.isForTrade?'<span class="cbadge cbadge-trade">For Trade</span>':''}
                     </div>
