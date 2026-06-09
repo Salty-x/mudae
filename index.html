@@ -200,7 +200,7 @@
         .char-card:hover .trade-toggle-btn { opacity: 1; pointer-events: auto; }
         .trade-toggle-btn.active { opacity: 1; pointer-events: auto; background: rgba(230,126,34,0.7); color: #fff; }
         .trade-toggle-btn:hover { background: rgba(230,126,34,0.8); transform: scale(1.1); }
-        .fav-btn { position: absolute; bottom: 6px; left: 6px; z-index: 10; background: rgba(0,0,0,0.45); border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: background 0.15s, transform 0.15s, opacity 0.15s; line-height: 1; padding: 0; opacity: 0; pointer-events: none; }
+        .fav-btn { position: absolute; top: 6px; left: 6px; z-index: 10; background: rgba(0,0,0,0.45); border: none; color: rgba(255,255,255,0.6); font-size: 0.85rem; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: background 0.15s, transform 0.15s, opacity 0.15s; line-height: 1; padding: 0; opacity: 0; pointer-events: none; }
         .char-card:hover .fav-btn { opacity: 1; pointer-events: auto; }
         .fav-btn.active { opacity: 1; pointer-events: auto; background: rgba(232,60,80,0.75); color: #fff; }
         .fav-btn:hover { background: rgba(232,60,80,0.85); transform: scale(1.1); }
@@ -352,6 +352,15 @@
             </div>
             <div class="tag-row" id="tradeTagsEdit"></div>
         </div>
+
+        <div class="box" id="favSeriesBox" style="display:none;">
+            <div class="box-title" style="color:#ff4d6d;">♥ Favorited Series <span style="font-size:0.7rem;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;">— whole series marked Not for Trade</span></div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="favSeriesInput" style="margin-bottom:0; flex: 1;" placeholder="Series name..." onkeydown="if(event.key==='Enter')addFavSeries()">
+                <button class="btn btn-sm" style="background:#ff4d6d;align-self:center;" onclick="addFavSeries()">Add ♥</button>
+            </div>
+            <div class="tag-row" id="favSeriesTagsEdit"></div>
+        </div>
     </div>
 
     <div class="view" id="view-gallery">
@@ -392,9 +401,11 @@
                 <select id="fSort" onchange="applyFilters()">
                     <option value="ka-desc">💎 Ka: High → Low</option>
                     <option value="ka-asc">💎 Ka: Low → High</option>
-                    <option value="alpha">A → Z</option>
+                    <option value="alpha">A → Z (Name)</option>
+                    <option value="series-alpha">A → Z (Series)</option>
                     <option value="keys-desc">🗝️ Keys: High → Low</option>
                 </select>
+                <button class="toggle-btn" id="favFilterBtn" onclick="toggleFavFilter()" title="Show favorites only">♥ Favorites</button>
                 <button class="toggle-btn" onclick="toggleCompactMode('charGrid')" title="Toggle Compact View">🖼️ / 📄 View</button>
             </div>
 
@@ -424,7 +435,8 @@
                 <select id="gfSort" onchange="applyGlobalFilters()">
                     <option value="ka-desc">💎 Ka: High → Low</option>
                     <option value="ka-asc">💎 Ka: Low → High</option>
-                    <option value="alpha">🔤 A → Z</option>
+                    <option value="alpha">🔤 A → Z (Name)</option>
+                    <option value="series-alpha">🔤 A → Z (Series)</option>
                     <option value="keys-desc">🗝️ Keys: Most first</option>
                 </select>
                 <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:700;color:var(--orange);white-space:nowrap;">
@@ -455,6 +467,13 @@
     let currentPage = 1, globalPage = 1;
     const PER_PAGE = 24;
     let isCompact = false;
+    let favFilterOn = false;
+    function toggleFavFilter() {
+        favFilterOn = !favFilterOn;
+        const btn = document.getElementById('favFilterBtn');
+        if (btn) { btn.style.borderColor = favFilterOn ? '#ff4d6d' : ''; btn.style.color = favFilterOn ? '#ff4d6d' : ''; }
+        applyFilters();
+    }
 
     // ── Theme Management ──
     function applyTheme(hexColor) {
@@ -517,6 +536,33 @@
     const favKey = p => `mudae_fav_${p}`;
     const getFavs = p => { try { return JSON.parse(localStorage.getItem(favKey(p)) || '[]'); } catch { return []; } };
     const saveFavs = (p, a) => localStorage.setItem(favKey(p), JSON.stringify(a));
+
+    // ── Favorited Series (localStorage, owner-only) ──
+    const favSeriesKey = p => `mudae_favs_${p}`;
+    const getFavSeries = p => { try { return JSON.parse(localStorage.getItem(favSeriesKey(p)) || '[]'); } catch { return []; } };
+    const saveFavSeries = (p, a) => localStorage.setItem(favSeriesKey(p), JSON.stringify(a));
+
+    function addFavSeries() {
+        if (!window.loggedInAs || window.loggedInAs !== window.activeProfile) return;
+        const v = document.getElementById('favSeriesInput').value.trim();
+        if (!v) return;
+        const arr = getFavSeries(window.activeProfile);
+        if (!arr.map(s=>s.toLowerCase()).includes(v.toLowerCase())) { arr.push(v); saveFavSeries(window.activeProfile, arr); }
+        document.getElementById('favSeriesInput').value = '';
+        renderFavSeriesEdit(); applyFilters(false); applyGlobalFilters(false);
+    }
+    function removeFavSeries(s) {
+        if (!window.loggedInAs || window.loggedInAs !== window.activeProfile) return;
+        saveFavSeries(window.activeProfile, getFavSeries(window.activeProfile).filter(x => x !== s));
+        renderFavSeriesEdit(); applyFilters(false); applyGlobalFilters(false);
+    }
+    function renderFavSeriesEdit() {
+        const el = document.getElementById('favSeriesTagsEdit');
+        if (!el || !window.activeProfile) return;
+        const arr = getFavSeries(window.activeProfile);
+        if (!arr.length) { el.innerHTML = '<span class="muted-msg">No series favorited yet.</span>'; return; }
+        el.innerHTML = arr.map(s => `<div class="tag-pill" style="background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3);color:#ff4d6d;"><span>${s}</span><button onclick="removeFavSeries('${s.replace(/'/g,"\\'")}')">✕</button></div>`).join('');
+    }
 
     function toggleFavChar(name, series, btn) {
         if (window.loggedInAs !== window.activeProfile) return;
@@ -740,7 +786,8 @@
         const isOwner = window.loggedInAs && window.loggedInAs === window.activeProfile;
         document.getElementById('importBox').style.display = isOwner ? 'block' : 'none';
         document.getElementById('tradeEditBox').style.display = isOwner ? 'block' : 'none';
-        if (isOwner) renderTradeEdit();
+        document.getElementById('favSeriesBox').style.display = isOwner ? 'block' : 'none';
+        if (isOwner) { renderTradeEdit(); renderFavSeriesEdit(); }
     }
 
     function selectProfile(name) {
@@ -891,7 +938,8 @@
     // ── Core Gallery Logic ──
     function annotateCharacter(c, activeTradeItems, activeInterestItems, wlArray, ownerName) {
         const ownerFavs = getFavs(ownerName).map(s => s.toLowerCase());
-        const isFavorited = ownerFavs.includes(c.name.toLowerCase());
+        const ownerFavSeries = getFavSeries(ownerName).map(s => s.toLowerCase());
+        const isFavorited = ownerFavs.includes(c.name.toLowerCase()) || ownerFavSeries.includes(c.series.toLowerCase());
         const rawForTrade = activeTradeItems.includes(c.series.toLowerCase()) || activeTradeItems.includes(c.name.toLowerCase());
         return {
             ...c,
@@ -922,6 +970,7 @@
         filtered = chars.map(c => annotateCharacter(c, tradeItems, myInt, wl, window.activeProfile)).filter(c=>{
             let ok = c.name.toLowerCase().includes(qN) && c.series.toLowerCase().includes(qS);
             if (qR) ok = ok && c.rollTypes && c.rollTypes.some(rt => rt.toLowerCase().includes(qR));
+            if (favFilterOn) ok = ok && c.isFavorited;
             return ok;
         });
 
@@ -981,6 +1030,13 @@
         if (sortParam==='ka-desc') arr.sort((a,b)=>(b.kakera-a.kakera)||a.name.localeCompare(b.name));
         else if (sortParam==='ka-asc') arr.sort((a,b)=>(a.kakera-b.kakera)||a.name.localeCompare(b.name));
         else if (sortParam==='alpha') arr.sort((a,b)=>a.name.localeCompare(b.name));
+        else if (sortParam==='series-alpha') arr.sort((a,b)=>{
+            const hasEmoji = s => /\p{Emoji_Presentation}/u.test(s);
+            const aE = hasEmoji(a.series), bE = hasEmoji(b.series);
+            if (aE && !bE) return -1;
+            if (!aE && bE) return 1;
+            return a.series.localeCompare(b.series)||a.name.localeCompare(b.name);
+        });
         else if (sortParam==='keys-desc') arr.sort((a,b)=>(b.keys||0)-(a.keys||0)||a.name.localeCompare(b.name));
     }
 
