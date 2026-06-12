@@ -207,6 +207,23 @@
         .char-card.favorited { border-left-color: #ff4d6d !important; }
         .char-card.favorited .img-wrap::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,77,109,0.08) 0%, transparent 60%); pointer-events: none; }
         .cbadge-fav { background: rgba(255,77,109,0.15); color: #ff4d6d; border: 1px solid rgba(255,77,109,0.35); }
+
+        /* ── Autocomplete ── */
+        .ac-wrap { position: relative; flex: 1; min-width: 0; }
+        .ac-wrap input { width: 100%; box-sizing: border-box; }
+        .ac-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; z-index: 200; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .ac-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; cursor: pointer; font-size: 0.82rem; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .ac-item:last-child { border-bottom: none; }
+        .ac-item:hover, .ac-item.ac-active { background: rgba(255,255,255,0.07); }
+        .ac-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ac-item-sub { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+        .ac-item-ka { font-size: 0.75rem; color: #f1c40f; white-space: nowrap; font-weight: 700; }
+
+        /* ── Global market tabs ── */
+        .gm-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .gm-tab { padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12); background: transparent; color: var(--muted); font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+        .gm-tab.active { background: var(--orange); border-color: var(--orange); color: #fff; }
+        .gm-tab.int-tab.active { background: var(--purple); border-color: var(--purple); color: #fff; }
         .char-body { padding: 10px 12px 12px; }
         .char-name { font-weight: 900; font-size: 0.9rem; line-height: 1.2; margin-bottom: 2px; padding-right: 18px; }
         .char-series { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; line-height: 1.3; }
@@ -395,8 +412,8 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="fName" placeholder="🔎 Character..." oninput="applyFilters()">
-                <input type="text" id="fSeries" placeholder="🔎 Series..." oninput="applyFilters()">
+                <div class="ac-wrap"><input type="text" id="fName" placeholder="🔎 Character..." oninput="applyFilters();showAc('fName','ac-fName','char')" onkeydown="acKey(event,'ac-fName')" autocomplete="off"><div class="ac-dropdown" id="ac-fName" style="display:none;"></div></div>
+                <div class="ac-wrap"><input type="text" id="fSeries" placeholder="🔎 Series..." oninput="applyFilters();showAc('fSeries','ac-fSeries','series')" onkeydown="acKey(event,'ac-fSeries')" autocomplete="off"><div class="ac-dropdown" id="ac-fSeries" style="display:none;"></div></div>
                 <input type="text" id="fRoll" placeholder="🔎 Roll (ha, wg...)" oninput="applyFilters()">
                 <select id="fSort" onchange="applyFilters()">
                     <option value="ka-desc">💎 Ka: High → Low</option>
@@ -406,6 +423,7 @@
                     <option value="keys-desc">🗝️ Keys: High → Low</option>
                 </select>
                 <button class="toggle-btn" id="favFilterBtn" onclick="toggleFavFilter()" title="Show favorites only">♥ Favorites</button>
+                <button class="toggle-btn" id="intFilterBtn" onclick="toggleIntFilter()" title="Show interested only">⭐ Interested</button>
                 <button class="toggle-btn" onclick="toggleCompactMode('charGrid')" title="Toggle Compact View">🖼️ / 📄 View</button>
             </div>
 
@@ -425,31 +443,62 @@
                 🌍 Global Market & Search
                 <button class="toggle-btn btn-sm" onclick="toggleCompactMode('globalGrid')" style="padding: 4px 8px; font-size: 0.7rem;">🖼️ / 📄</button>
             </div>
-            <p class="muted-msg" style="margin-bottom:12px;">Search for any character across all profiles. Leave blank to browse all "For Trade" items.</p>
 
-            <div class="filters" style="margin-bottom:8px;">
-                <input type="text" id="globalSearch"    placeholder="🔎 Character or series..." oninput="applyGlobalFilters()" style="border-color:var(--orange);">
-                <input type="text" id="gfRoll"          placeholder="🔎 Roll type (ha, wa...)"   oninput="applyGlobalFilters()">
-                <input type="number" id="gfMinKa"       placeholder="Min 💎 ka"  min="0"          oninput="applyGlobalFilters()">
-                <input type="number" id="gfMaxKa"       placeholder="Max 💎 ka"  min="0"          oninput="applyGlobalFilters()">
-                <select id="gfSort" onchange="applyGlobalFilters()">
-                    <option value="ka-desc">💎 Ka: High → Low</option>
-                    <option value="ka-asc">💎 Ka: Low → High</option>
-                    <option value="alpha">🔤 A → Z (Name)</option>
-                    <option value="series-alpha">🔤 A → Z (Series)</option>
-                    <option value="keys-desc">🗝️ Keys: Most first</option>
-                </select>
-                <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:700;color:var(--orange);white-space:nowrap;">
-                    <input type="checkbox" id="gfTradeOnly" onchange="applyGlobalFilters()" style="width:16px;height:16px;margin:0;"> For Trade only
-                </label>
+            <div class="gm-tabs">
+                <button class="gm-tab active" id="gmTab-trade" onclick="switchGmTab('trade')">🤝 For Trade</button>
+                <button class="gm-tab int-tab" id="gmTab-interested" onclick="switchGmTab('interested')">⭐ My Interests</button>
             </div>
 
-            <div class="result-count" id="globalResultCount">— characters found</div>
-            <div class="char-grid" id="globalGrid"></div>
-            <div class="pager">
-                <button id="gPrevBtn" onclick="goPage(-1, 'global')">← Prev</button>
-                <span id="gPageInfo">Page 1 of 1</span>
-                <button id="gNextBtn" onclick="goPage(1, 'global')">Next →</button>
+            <div id="gmPane-trade">
+                <p class="muted-msg" style="margin-bottom:12px;">Browse all "For Trade" items across every profile, or search anything. Filter by a specific person below.</p>
+                <div class="filters" style="margin-bottom:8px;">
+                    <div class="ac-wrap"><input type="text" id="globalSearch" placeholder="🔎 Character or series..." oninput="applyGlobalFilters();showAc('globalSearch','ac-globalSearch','global')" onkeydown="acKey(event,'ac-globalSearch')" style="border-color:var(--orange);" autocomplete="off"><div class="ac-dropdown" id="ac-globalSearch" style="display:none;"></div></div>
+                    <input type="text" id="gfRoll"          placeholder="🔎 Roll type (ha, wa...)"   oninput="applyGlobalFilters()">
+                    <input type="number" id="gfMinKa"       placeholder="Min 💎 ka"  min="0"          oninput="applyGlobalFilters()">
+                    <input type="number" id="gfMaxKa"       placeholder="Max 💎 ka"  min="0"          oninput="applyGlobalFilters()">
+                    <select id="gfProfile" onchange="applyGlobalFilters()">
+                        <option value="">👥 All profiles</option>
+                    </select>
+                    <select id="gfSort" onchange="applyGlobalFilters()">
+                        <option value="ka-desc">💎 Ka: High → Low</option>
+                        <option value="ka-asc">💎 Ka: Low → High</option>
+                        <option value="alpha">🔤 A → Z (Name)</option>
+                        <option value="series-alpha">🔤 A → Z (Series)</option>
+                        <option value="keys-desc">🗝️ Keys: Most first</option>
+                    </select>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:700;color:var(--orange);white-space:nowrap;">
+                        <input type="checkbox" id="gfTradeOnly" onchange="applyGlobalFilters()" style="width:16px;height:16px;margin:0;"> For Trade only
+                    </label>
+                </div>
+                <div class="result-count" id="globalResultCount">— characters found</div>
+                <div class="char-grid" id="globalGrid"></div>
+                <div class="pager">
+                    <button id="gPrevBtn" onclick="goPage(-1, 'global')">← Prev</button>
+                    <span id="gPageInfo">Page 1 of 1</span>
+                    <button id="gNextBtn" onclick="goPage(1, 'global')">Next →</button>
+                </div>
+            </div>
+
+            <div id="gmPane-interested" style="display:none;">
+                <p class="muted-msg" style="margin-bottom:12px;">Characters from your interest list found across all profiles.</p>
+                <div class="filters" style="margin-bottom:8px;">
+                    <select id="gifProfile" onchange="applyInterestedFilters()">
+                        <option value="">👥 All profiles</option>
+                    </select>
+                    <select id="gifSort" onchange="applyInterestedFilters()">
+                        <option value="ka-desc">💎 Ka: High → Low</option>
+                        <option value="ka-asc">💎 Ka: Low → High</option>
+                        <option value="alpha">🔤 A → Z (Name)</option>
+                        <option value="series-alpha">🔤 A → Z (Series)</option>
+                    </select>
+                </div>
+                <div class="result-count" id="intResultCount">— characters found</div>
+                <div class="char-grid" id="intGrid"></div>
+                <div class="pager">
+                    <button id="iPrevBtn" onclick="goPage(-1, 'interested')">← Prev</button>
+                    <span id="iPageInfo">Page 1 of 1</span>
+                    <button id="iNextBtn" onclick="goPage(1, 'interested')">Next →</button>
+                </div>
             </div>
         </div>
     </div>
@@ -468,10 +517,17 @@
     const PER_PAGE = 24;
     let isCompact = false;
     let favFilterOn = false;
+    let intFilterOn = false;
     function toggleFavFilter() {
         favFilterOn = !favFilterOn;
         const btn = document.getElementById('favFilterBtn');
         if (btn) { btn.style.borderColor = favFilterOn ? '#ff4d6d' : ''; btn.style.color = favFilterOn ? '#ff4d6d' : ''; }
+        applyFilters();
+    }
+    function toggleIntFilter() {
+        intFilterOn = !intFilterOn;
+        const btn = document.getElementById('intFilterBtn');
+        if (btn) { btn.style.borderColor = intFilterOn ? '#f1c40f' : ''; btn.style.color = intFilterOn ? '#f1c40f' : ''; }
         applyFilters();
     }
 
@@ -712,14 +768,14 @@
 
     window.syncUIWithCloud = () => {
         if (!window.activeProfile && Object.keys(window.db).length > 0) window.activeProfile = Object.keys(window.db)[0];
-        // Restore interest color picker value
         const savedColor = localStorage.getItem('mudae_interest_color');
         if (savedColor) { const p = document.getElementById('interestColorPicker'); if(p) p.value = savedColor; }
         refreshProfilesTab();
+        populateGfProfiles();
         if(document.getElementById('view-gallery').classList.contains('active')) {
             populateGallerySelect(); renderInterests(); applyFilters(false);
         }
-        if(document.getElementById('view-global').classList.contains('active')) applyGlobalFilters(false);
+        if(document.getElementById('view-global').classList.contains('active')) { applyGlobalFilters(false); if (gmActiveTab === 'interested') applyInterestedFilters(false); }
     };
 
     function pushCloud() {
@@ -794,7 +850,7 @@
         window.activeProfile = name;
         document.getElementById('galleryTitle').textContent = `${name}'s Collection`;
         applyTheme(window.profileMeta[name]?.theme);
-        refreshProfilesTab(); populateGallerySelect(); renderInterests(); applyFilters();
+        refreshProfilesTab(); populateGallerySelect(); populateGfProfiles(); renderInterests(); applyFilters();
     }
     function switchGalleryProfile(name) { selectProfile(name); }
 
@@ -971,6 +1027,7 @@
             let ok = c.name.toLowerCase().includes(qN) && c.series.toLowerCase().includes(qS);
             if (qR) ok = ok && c.rollTypes && c.rollTypes.some(rt => rt.toLowerCase().includes(qR));
             if (favFilterOn) ok = ok && c.isFavorited;
+            if (intFilterOn) ok = ok && c.isInterested;
             return ok;
         });
 
@@ -990,6 +1047,7 @@
         const maxKa     = parseInt(document.getElementById('gfMaxKa')?.value)||Infinity;
         const sort      = document.getElementById('gfSort')?.value||'ka-desc';
         const tradeOnly = document.getElementById('gfTradeOnly')?.checked||false;
+        const profileQ  = document.getElementById('gfProfile')?.value||'';
         const hasSearch = q !== '' || rollQ !== '' || minKa > 0 || maxKa < Infinity;
 
         let allMarketChars = [];
@@ -997,29 +1055,21 @@
         const wl = window.activeProfile ? (document.getElementById('wishlistInput')?.value.toLowerCase()||'').split(/[,|\n]+/).map(w=>w.trim()).filter(Boolean) : [];
 
         for (const owner in window.db) {
+            if (profileQ && owner !== profileQ) continue;
             const ownerTradeItems = (window.tradeDB[owner] || []).map(s=>s.toLowerCase());
             window.db[owner].forEach(c => {
                 const ann = annotateCharacter(c, ownerTradeItems, myInt, wl, owner);
-
-                // Trade filter: in browse mode (no search) default to trade only; checkbox overrides
                 if (!hasSearch || tradeOnly) { if (!ann.isForTrade) return; }
-
-                // Text search: name or series
                 if (q && !ann.name.toLowerCase().includes(q) && !ann.series.toLowerCase().includes(q)) return;
-
-                // Roll type filter
                 if (rollQ && !(ann.rollTypes||[]).some(r=>r.toLowerCase().includes(rollQ))) return;
-
-                // Kakera range
                 if (ann.kakera < minKa || ann.kakera > maxKa) return;
-
                 allMarketChars.push(ann);
             });
         }
 
         sortData(allMarketChars, sort);
         globalFiltered = allMarketChars;
-        document.getElementById('globalResultCount').textContent = `${globalFiltered.length} characters found globally`;
+        document.getElementById('globalResultCount').textContent = `${globalFiltered.length} characters found`;
         if (resetPage) globalPage = 1;
         const gTotal = Math.ceil(globalFiltered.length / PER_PAGE) || 1;
         globalPage = Math.max(1, Math.min(globalPage, gTotal));
@@ -1043,7 +1093,138 @@
     function goPage(d, type) { 
         if(type === 'gallery') { currentPage+=d; renderGrid('charGrid', filtered, currentPage, 'pageInfo', 'prevBtn', 'nextBtn'); document.getElementById('galleryTitle').scrollIntoView(); }
         if(type === 'global') { globalPage+=d; renderGrid('globalGrid', globalFiltered, globalPage, 'gPageInfo', 'gPrevBtn', 'gNextBtn'); document.getElementById('globalSearch').scrollIntoView(); }
+        if(type === 'interested') { intPage+=d; renderGrid('intGrid', intFiltered, intPage, 'iPageInfo', 'iPrevBtn', 'iNextBtn'); }
     }
+
+    // ── Global Market Tabs ──
+    let gmActiveTab = 'trade';
+    function switchGmTab(tab) {
+        gmActiveTab = tab;
+        document.getElementById('gmPane-trade').style.display = tab === 'trade' ? '' : 'none';
+        document.getElementById('gmPane-interested').style.display = tab === 'interested' ? '' : 'none';
+        document.getElementById('gmTab-trade').classList.toggle('active', tab === 'trade');
+        document.getElementById('gmTab-interested').classList.toggle('active', tab === 'interested');
+        if (tab === 'interested') applyInterestedFilters();
+    }
+
+    // ── Profile selectors in global market ──
+    function populateGfProfiles() {
+        const profiles = Object.keys(window.db || {});
+        ['gfProfile','gifProfile'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">👥 All profiles</option>' + profiles.map(p=>`<option value="${p}"${p===cur?' selected':''}>${p}</option>`).join('');
+        });
+    }
+
+    // ── Interested Tab ──
+    let intFiltered = [], intPage = 1;
+    function applyInterestedFilters(resetPage = true) {
+        if (!window.activeProfile) return;
+        const myInt = getInterests(window.activeProfile).map(s => s.toLowerCase());
+        if (!myInt.length) { document.getElementById('intResultCount').textContent = 'No interests tagged yet.'; document.getElementById('intGrid').innerHTML = ''; return; }
+
+        const profileQ = document.getElementById('gifProfile')?.value || '';
+        const sort = document.getElementById('gifSort')?.value || 'ka-desc';
+        const wl = (document.getElementById('wishlistInput')?.value.toLowerCase()||'').split(/[,|\n]+/).map(w=>w.trim()).filter(Boolean);
+
+        let results = [];
+        for (const owner in window.db) {
+            if (profileQ && owner !== profileQ) continue;
+            const ownerTradeItems = (window.tradeDB[owner]||[]).map(s=>s.toLowerCase());
+            window.db[owner].forEach(c => {
+                const ann = annotateCharacter(c, ownerTradeItems, myInt, wl, owner);
+                if (ann.isInterested) results.push(ann);
+            });
+        }
+        sortData(results, sort);
+        intFiltered = results;
+        document.getElementById('intResultCount').textContent = `${intFiltered.length} characters found`;
+        if (resetPage) intPage = 1;
+        const total = Math.ceil(intFiltered.length / PER_PAGE) || 1;
+        intPage = Math.max(1, Math.min(intPage, total));
+        renderGrid('intGrid', intFiltered, intPage, 'iPageInfo', 'iPrevBtn', 'iNextBtn');
+    }
+
+    // ── Autocomplete ──
+    let acIndex = -1;
+    function showAc(inputId, dropId, mode) {
+        const inp = document.getElementById(inputId);
+        const drop = document.getElementById(dropId);
+        if (!inp || !drop) return;
+        const q = inp.value.trim().toLowerCase();
+        if (!q) { drop.style.display = 'none'; acIndex = -1; return; }
+
+        let candidates = [];
+        const seen = new Set();
+
+        if (mode === 'char' && window.activeProfile && window.db[window.activeProfile]) {
+            window.db[window.activeProfile].forEach(c => {
+                if (c.name.toLowerCase().includes(q) && !seen.has(c.name)) {
+                    seen.add(c.name);
+                    candidates.push({ label: c.name, sub: c.series, ka: c.kakera });
+                }
+            });
+        } else if (mode === 'series' && window.activeProfile && window.db[window.activeProfile]) {
+            const seriesMap = {};
+            window.db[window.activeProfile].forEach(c => {
+                if (c.series.toLowerCase().includes(q)) {
+                    if (!seriesMap[c.series]) seriesMap[c.series] = { count: 0, ka: 0 };
+                    seriesMap[c.series].count++;
+                    seriesMap[c.series].ka += c.kakera;
+                }
+            });
+            candidates = Object.entries(seriesMap).map(([s,v]) => ({ label: s, sub: `${v.count} chars`, ka: v.ka }));
+        } else if (mode === 'global') {
+            const charMap = {}, seriesMap = {};
+            for (const owner in window.db) {
+                window.db[owner].forEach(c => {
+                    if (c.name.toLowerCase().includes(q) && !charMap[c.name]) charMap[c.name] = { sub: c.series, ka: c.kakera, owner };
+                    if (c.series.toLowerCase().includes(q) && !seriesMap[c.series]) seriesMap[c.series] = { count: 0, ka: 0 };
+                    if (seriesMap[c.series]) { seriesMap[c.series].count++; seriesMap[c.series].ka += c.kakera; }
+                });
+            }
+            Object.entries(charMap).slice(0, 6).forEach(([n,v]) => candidates.push({ label: n, sub: `${v.sub} · ${v.owner}`, ka: v.ka }));
+            Object.entries(seriesMap).slice(0, 4).forEach(([s,v]) => { if (!charMap[s]) candidates.push({ label: s, sub: `${v.count} chars`, ka: v.ka }); });
+        }
+
+        candidates = candidates.sort((a,b) => b.ka - a.ka).slice(0, 8);
+        if (!candidates.length) { drop.style.display = 'none'; return; }
+
+        acIndex = -1;
+        drop.innerHTML = candidates.map((c, i) =>
+            `<div class="ac-item" data-val="${c.label.replace(/"/g,'&quot;')}" onmousedown="pickAc('${inputId}','${dropId}',this)">
+                <span class="ac-item-name">${c.label}</span>
+                <span class="ac-item-sub">${c.sub}</span>
+                <span class="ac-item-ka">💎 ${c.ka.toLocaleString()}</span>
+            </div>`
+        ).join('');
+        drop.style.display = 'block';
+    }
+
+    function pickAc(inputId, dropId, el) {
+        document.getElementById(inputId).value = el.dataset.val;
+        document.getElementById(dropId).style.display = 'none';
+        acIndex = -1;
+        if (inputId === 'globalSearch') applyGlobalFilters();
+        else applyFilters();
+    }
+
+    function acKey(e, dropId) {
+        const drop = document.getElementById(dropId);
+        if (!drop || drop.style.display === 'none') return;
+        const items = drop.querySelectorAll('.ac-item');
+        if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex+1, items.length-1); items.forEach((el,i)=>el.classList.toggle('ac-active',i===acIndex)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex-1, 0); items.forEach((el,i)=>el.classList.toggle('ac-active',i===acIndex)); }
+        else if (e.key === 'Enter' && acIndex >= 0) { e.preventDefault(); items[acIndex].dispatchEvent(new MouseEvent('mousedown')); }
+        else if (e.key === 'Escape') { drop.style.display = 'none'; acIndex = -1; }
+    }
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', e => {
+        document.querySelectorAll('.ac-dropdown').forEach(d => { if (!d.parentElement.contains(e.target)) d.style.display = 'none'; });
+    });
 
     // Generic Grid Renderer
     function renderGrid(containerId, dataArray, pageNum, infoId, prevId, nextId) {
