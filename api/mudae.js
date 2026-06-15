@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         // Fallback: first result
         if (!charId) {
             const idMatch = html.match(idRegex);
-            if (!idMatch) return res.status(404).json({ error: 'Character not found' });
+            if (!idMatch) return res.status(404).json({ error: 'Character not found', htmlSnippet: html.slice(0, 500) });
             charId = idMatch[1];
         }
 
