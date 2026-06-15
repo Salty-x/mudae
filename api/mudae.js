@@ -5,11 +5,16 @@ export default async function handler(req, res) {
     const { name, series } = req.query;
     if (!name) return res.status(400).json({ error: 'No character name provided' });
 
+    // mudae.net uses underscores in URLs, not %20
+    const nameForUrl = name.trim().replace(/\s+/g, '_');
+
     try {
-        const searchUrl = `https://mudae.net/search?type=character&name=${encodeURIComponent(name)}`;
+        const searchUrl = `https://mudae.net/search?type=character&name=${encodeURIComponent(name.trim())}`;
         const searchRes = await fetch(searchUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
             }
         });
 
@@ -17,10 +22,9 @@ export default async function handler(req, res) {
 
         // Try to find character ID — if series provided, match it; otherwise take first result
         let charId = null;
+        const idRegex = /\/character\/(\d+)\//;
+
         if (series) {
-            // Find all character rows and match by series
-            const rowRegex = /\/character\/(\d+)\/[^"]+[^>]*>[\s\S]*?<\/tr>/gi;
-            const idRegex = /\/character\/(\d+)\//;
             const rows = html.split('<tr');
             for (const row of rows) {
                 if (row.toLowerCase().includes(series.toLowerCase())) {
@@ -30,21 +34,37 @@ export default async function handler(req, res) {
             }
         }
 
-        // Fallback to first result
+        // Fallback: first result
         if (!charId) {
-            const idMatch = html.match(/\/character\/(\d+)\//);
+            const idMatch = html.match(idRegex);
             if (!idMatch) return res.status(404).json({ error: 'Character not found' });
             charId = idMatch[1];
         }
 
-        const charUrl = `https://mudae.net/character/${charId}/${encodeURIComponent(name)}`;
-        const charRes = await fetch(charUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
-            }
-        });
+        // Try underscore URL first, then %20, then bare name
+        const urlVariants = [
+            `https://mudae.net/character/${charId}/${nameForUrl}`,
+            `https://mudae.net/character/${charId}/${encodeURIComponent(name.trim())}`,
+            `https://mudae.net/character/${charId}/`,
+        ];
 
-        const charHtml = await charRes.text();
+        let charHtml = null;
+        for (const charUrl of urlVariants) {
+            const charRes = await fetch(charUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': 'https://mudae.net/'
+                }
+            });
+            const text = await charRes.text();
+            // Check if we actually got a character page (has an image upload)
+            if (text.includes('mudae.net/uploads/')) {
+                charHtml = text;
+                break;
+            }
+        }
+
+        if (!charHtml) return res.status(404).json({ error: 'Character page not found' });
 
         // Extract image URL
         const imgMatch = charHtml.match(/https:\/\/mudae\.net\/uploads\/[^"']+\.(?:png|jpg|jpeg|gif|webp)/i);
@@ -57,6 +77,8 @@ export default async function handler(req, res) {
                 'Referer': 'https://mudae.net/'
             }
         });
+
+        if (!imgRes.ok) return res.status(404).json({ error: 'Image fetch failed' });
 
         const imgBuffer = await imgRes.arrayBuffer();
         const contentType = imgRes.headers.get('content-type') || 'image/png';
