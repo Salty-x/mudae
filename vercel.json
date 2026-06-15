@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/mudae.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "regions": ["cdg1"]
+}
